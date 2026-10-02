@@ -9,6 +9,7 @@ on:
       - main
     tags:
       - 'v*'
+  workflow_dispatch:
 
 defaults:
   run:
@@ -19,7 +20,7 @@ env:
   RUSTC_BOOTSTRAP: "1"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || (github.event_name == 'workflow_dispatch' && github.run_id) || github.ref }}
   cancel-in-progress: true
 
 jobs:
