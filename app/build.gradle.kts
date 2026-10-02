@@ -1,3 +1,7 @@
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.ValueSource
+import org.gradle.api.provider.ValueSourceParameters
+
 plugins {
 	alias(libs.plugins.android.application)
 	alias(libs.plugins.kotlin.compose)
@@ -20,6 +24,60 @@ fun Project.exec(command: String): String =
 		.trim()
 
 fun env(key: String): String? = System.getenv(key).let { if (it.isNullOrEmpty()) null else it }
+
+/**
+ * Resolves the version of the Android component of `rustls-platform-verifier`
+ * from the Cargo lockfile.
+ *
+ * `rustls-platform-verifier` is a Rust crate, but on Android it calls into a
+ * Kotlin component (`org.rustls.platformverifier`) which is shipped as an AAR.
+ * That AAR must have exactly the same version as the
+ * `rustls-platform-verifier-android` crate Cargo resolved, otherwise the JNI
+ * handshake between the two halves fails at runtime.
+ */
+abstract class RustlsPlatformVerifierVersion : ValueSource<String, RustlsPlatformVerifierVersion.Params> {
+	interface Params : ValueSourceParameters {
+		val lockFile: RegularFileProperty
+	}
+
+	companion object {
+		const val CRATE_NAME = "rustls-platform-verifier-android"
+	}
+
+	override fun obtain(): String {
+		val version =
+			parameters.lockFile.get().asFile.readLines().let { lines ->
+				val nameIdx = lines.indexOfFirst { it.trim() == "name = \"$CRATE_NAME\"" }
+				if (nameIdx < 0) {
+					null
+				} else {
+					lines
+						.drop(nameIdx + 1)
+						.firstOrNull { it.trimStart().startsWith("version = ") }
+						?.substringAfter('"', "")
+						?.substringBefore('"', "")
+						?.takeIf { it.isNotEmpty() }
+				}
+			}
+		return version ?: error("$CRATE_NAME not found in Cargo.lock")
+	}
+}
+
+val rustlsPlatformVerifierVersion =
+	providers.of(RustlsPlatformVerifierVersion::class.java) {
+		parameters.lockFile.set(layout.projectDirectory.file("../uniffi/Cargo.lock"))
+	}
+
+// The Kotlin component is declared without a version in the version catalog so
+// that it always tracks the Rust crate resolved by Cargo.
+configurations.configureEach {
+	resolutionStrategy.eachDependency {
+		if (requested.group == "org.rustls" && requested.name == "rustls-platform-verifier") {
+			useVersion(rustlsPlatformVerifierVersion.get())
+			because("the Kotlin component must match the version of the ${RustlsPlatformVerifierVersion.CRATE_NAME} Rust crate")
+		}
+	}
+}
 
 android {
 	buildToolsVersion = rootProject.extra["buildToolsVersion"] as String
@@ -97,6 +155,9 @@ kotlin {
 
 dependencies {
 	implementation(project(":core"))
+	// Kotlin half of `rustls-platform-verifier`; the version is pinned to the
+	// `rustls-platform-verifier-android` crate by the resolution strategy above.
+	implementation(libs.rustls.platform.verifier)
 	implementation(platform(libs.androidx.compose.bom))
 	implementation(libs.androidx.lifecycle.viewmodel.compose)
 	implementation(libs.androidx.runtime.livedata)

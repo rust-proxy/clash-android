@@ -40,14 +40,15 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 hyper = { version = "1", features = ["client", "http1"] }
 hyper-util = { version = "0.1", features = ["client", "client-legacy", "tokio"] }
-hyper-rustls = { version = "0.27", features = ["webpki-roots", "http1", "tls12", "logging", "aws-lc-rs"] }
 http-body-util = "0.1"
-reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls-webpki-roots", "stream"] }
+# reqwest's `rustls` feature verifies TLS through `rustls-platform-verifier`
+# (the OS/Android trust store) instead of bundled webpki roots.
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "stream"] }
 tokio-stream = "0.1"
 urlencoding = "2"
 
 rustls = { version = "0.23", default-features = false, features = ["std", "aws-lc-rs"] }
-webpki-roots = "1"
+rustls-platform-verifier = "0.7.1"
 tokio-util = { version = "0.7", features = ["rt"] }
 tikv-jemallocator = { version = "0.6", optional = true }
 mimalloc = { version = "0.1", default-features = false, optional = true }
@@ -58,6 +59,9 @@ tempfile = "3"
 hyperlocal = "0.9"
 
 hyper-http-proxy = { version = "1", default-features = false, features = ["rustls-tls-webpki-roots"] }
+
+hyper-rustls = { version = "0.27", features = ["rustls-platform-verifier", "http1", "tls12", "logging", "aws-lc-rs"] }
+webpki-roots = "1"
 
 # Pin pkcs5 to avoid breaking rename in 0.8.0 final (recommended → generate_recommended)
 pkcs5 = "=0.8.0-rc.13"

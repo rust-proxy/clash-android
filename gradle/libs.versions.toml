@@ -48,6 +48,11 @@ compose-destinations-ksp = { group = "io.github.raamcosta.compose-destinations",
 ktlint-compose-rules = { group = "io.nlopez.compose.rules", name = "ktlint", version.ref = "ktlint-compose" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
 
+# Android component of `rustls-platform-verifier`. Deliberately version-less:
+# app/build.gradle.kts pins it to the `rustls-platform-verifier-android` crate
+# version recorded in uniffi/Cargo.lock.
+rustls-platform-verifier = { group = "org.rustls", name = "rustls-platform-verifier" }
+
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

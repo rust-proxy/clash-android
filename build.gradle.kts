@@ -15,5 +15,13 @@ allprojects {
 	repositories {
 		google()
 		mavenCentral()
+		// Android component of `rustls-platform-verifier`, published by the
+		// rustls project on the `maven-archive` branch (see app/build.gradle.kts).
+		maven {
+			url = uri("https://github.com/rustls/rustls-platform-verifier/raw/maven-archive/android-release-support/maven/")
+			content {
+				includeGroup("org.rustls")
+			}
+		}
 	}
 }

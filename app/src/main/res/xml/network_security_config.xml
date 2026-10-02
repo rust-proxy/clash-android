@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Allow cleartext HTTP to Let's Encrypt CRL/OCSP endpoints so Android's
+  PKIXRevocationChecker (used by rustls-platform-verifier) can fetch
+  revocation data. Without this, LE-issued certs fail with "Revoked"
+  because CRL/OCSP URLs are http:// and Android blocks cleartext by
+  default on API 28+.
+  See: https://github.com/matrix-org/matrix-rust-sdk/issues/6319
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">lencr.org</domain>
+    </domain-config>
+</network-security-config>

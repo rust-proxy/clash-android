@@ -93,7 +93,7 @@ impl ClashInstance {
 pub extern "system" fn java_init(
     mut env: jni::EnvUnowned,
     _class: jni::objects::JClass,
-    _context: jni::objects::JObject,
+    #[cfg_attr(not(target_os = "android"), allow(unused_variables))] context: jni::objects::JObject,
 ) {
     use jni::{Outcome, errors::Result as JniResult};
 
@@ -154,6 +154,25 @@ pub extern "system" fn java_init(
         }
         info!("Init logger and crypto provider initialized");
     });
+
+    // Hand Android's certificate verifier to `rustls-platform-verifier` so that
+    // every rustls client (e.g. reqwest downloads) validates TLS chains with the
+    // OS trust store, including user-installed CAs and revocation checks.
+    // Must run before any TLS connection is attempted.
+    #[cfg(target_os = "android")]
+    {
+        match env
+            .with_env(|env| -> JniResult<()> {
+                rustls_platform_verifier::android::init_with_env(env, context)?;
+                Ok(())
+            })
+            .into_outcome()
+        {
+            Outcome::Ok(_) => info!("Initialized rustls-platform-verifier"),
+            Outcome::Err(e) => error!("rustls-platform-verifier init JNI error: {e:?}"),
+            Outcome::Panic(p) => std::panic::resume_unwind(p),
+        };
+    }
 }
 
 #[uniffi::export]
