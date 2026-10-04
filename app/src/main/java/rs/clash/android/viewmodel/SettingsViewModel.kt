@@ -2,6 +2,7 @@ package rs.clash.android.viewmodel
 
 import android.app.Application
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -55,6 +56,30 @@ class SettingsViewModel(
 
 	var disallowedApps: Set<String> by mutableStateOf(loadDisallowedApps())
 		private set
+
+	// The app filter is edited on a different screen (the app selector writes the same
+	// "settings" file through its own ViewModel instance), and this screen can come back
+	// without its ViewModel being recreated. Re-reading the three app-filter values whenever
+	// the file changes keeps `getAppFilterSummary()` from showing a stale count.
+	// The listener is deliberately stored in a field: SharedPreferences keeps registered
+	// listeners only weakly, so an inline listener could be collected and never called.
+	private val preferenceChangeListener =
+		SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+			when (key) {
+				"app_filter_mode" -> appFilterMode = loadAppFilterMode()
+				"allowed_apps" -> allowedApps = loadAllowedApps()
+				"disallowed_apps" -> disallowedApps = loadDisallowedApps()
+			}
+		}
+
+	init {
+		prefs.registerOnSharedPreferenceChangeListener(preferenceChangeListener)
+	}
+
+	override fun onCleared() {
+		super.onCleared()
+		prefs.unregisterOnSharedPreferenceChangeListener(preferenceChangeListener)
+	}
 
 	private fun loadDarkModePreference(): DarkModePreference {
 		val value = prefs.getString("dark_mode", "SYSTEM") ?: "SYSTEM"

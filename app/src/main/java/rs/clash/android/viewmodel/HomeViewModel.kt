@@ -1,5 +1,6 @@
 package rs.clash.android.viewmodel
 
+import android.app.Application
 import android.content.Context.MODE_PRIVATE
 import android.content.Intent
 import android.content.SharedPreferences
@@ -13,7 +14,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -21,6 +22,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import rs.clash.android.Global
+import rs.clash.android.R
 import rs.clash.android.service.TunService
 import rs.clash.android.service.tunService
 import rs.clash.android.ui.snackbar.SnackbarController.Companion.showMessage
@@ -30,7 +32,9 @@ import uniffi.clash_android_ffi.MemoryResponse
 import uniffi.clash_android_ffi.Proxy
 import uniffi.clash_android_ffi.formatEyreError
 
-class HomeViewModel : ViewModel() {
+class HomeViewModel(
+	application: Application,
+) : AndroidViewModel(application) {
 	var profilePath by mutableStateOf<String?>(null)
 		private set
 	var isVpnRunning by mutableStateOf(tunService != null)
@@ -115,8 +119,14 @@ class HomeViewModel : ViewModel() {
 			connectionCount = connResponse.connections.size
 			totalDownload = connResponse.downloadTotal
 			totalUpload = connResponse.uploadTotal
-		} catch (e: EyreException) {
-			showMessage("Failed to fetch stats ${formatEyreError(e)}" )
+		} catch (e: Exception) {
+			Log.e("HomeViewModel", "Failed to fetch overview stats", e)
+			showMessage(
+				getApplication<Application>().getString(
+					R.string.home_stats_error,
+					e.message ?: e.toString(),
+				),
+			)
 		}
 	}
 
@@ -135,8 +145,14 @@ class HomeViewModel : ViewModel() {
 					}
 				}
 				this@HomeViewModel.proxies = proxies.toTypedArray()
-			} catch (e: EyreException) {
-				showMessage("API Error: ${formatEyreError(e)}")
+			} catch (e: Exception) {
+				Log.e("HomeViewModel", "Failed to fetch proxies", e)
+				showMessage(
+					getApplication<Application>().getString(
+						R.string.home_api_error,
+						(e as? EyreException)?.let(::formatEyreError) ?: e.message ?: e.toString(),
+					),
+				)
 			} finally {
 				isRefreshing = false
 			}
@@ -172,8 +188,14 @@ class HomeViewModel : ViewModel() {
 			try {
 				controller.selectProxy(groupName, proxyName)
 				fetchProxies()
-			} catch (e: EyreException) {
-				showMessage("Failed to select proxy ${e.message}")
+			} catch (e: Exception) {
+				Log.e("HomeViewModel", "Failed to select proxy $groupName -> $proxyName", e)
+				showMessage(
+					getApplication<Application>().getString(
+						R.string.home_select_proxy_failed,
+						(e as? EyreException)?.let(::formatEyreError) ?: e.message ?: e.toString(),
+					),
+				)
 			}
 		}
 	}
@@ -181,7 +203,7 @@ class HomeViewModel : ViewModel() {
 	fun startVpn(launcher: ManagedActivityResultLauncher<Intent, ActivityResult>? = null) {
 		val app = Global.application
 		if (Global.profilePath.isEmpty()) {
-			showMessage("Please select a config file first")
+			showMessage(getApplication<Application>().getString(R.string.home_select_profile_first))
 			return
 		}
 		val intent = VpnService.prepare(app)

@@ -42,7 +42,11 @@ class ConnectionsViewModel : ViewModel() {
 	private fun startPolling() {
 		pollingJob = viewModelScope.launch(Dispatchers.Default) {
 			while (isActive) {
-				fetchConnections()
+				// The controller talks to clash's unix socket, so there is nothing to
+				// poll (and nothing to report) while the VPN is down.
+				if (Global.isServiceRunning.value) {
+					fetchConnections()
+				}
 				delay(2000)
 			}
 		}

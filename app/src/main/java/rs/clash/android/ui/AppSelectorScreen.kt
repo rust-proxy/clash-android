@@ -104,6 +104,18 @@ fun AppSelectorScreen(
 		)
 	}
 
+	// Switching the filter mode has to re-seed the working selection, otherwise the
+	// previously chosen package set leaks into the new mode (and switching back to
+	// "Allowed" shows nothing selected even though apps are configured).
+	LaunchedEffect(tempFilterMode) {
+		selectedApps =
+			when (tempFilterMode) {
+				AppFilterMode.ALLOWED -> viewModel.allowedApps
+				AppFilterMode.DISALLOWED -> viewModel.disallowedApps
+				AppFilterMode.ALL -> emptySet()
+			}
+	}
+
 	// Load apps when screen opens
 	LaunchedEffect(Unit) {
 		coroutineScope.launch {
@@ -322,14 +334,9 @@ fun AppSelectorScreen(
 										.selectable(
 											selected = tempFilterMode == mode,
 											onClick = {
-												val oldMode = tempFilterMode
+												// The selection is re-seeded from the mode's
+												// stored app list by the LaunchedEffect above.
 												tempFilterMode = mode
-												// Clear selections when switching modes
-												if (mode == AppFilterMode.ALL) {
-													selectedApps = emptySet()
-												} else if (oldMode != mode) {
-													selectedApps = emptySet()
-												}
 												showModeDialog = false
 											},
 											role = Role.RadioButton,

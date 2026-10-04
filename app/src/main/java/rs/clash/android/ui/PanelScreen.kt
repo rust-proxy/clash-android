@@ -173,7 +173,12 @@ private fun ProxyTab(
 										onSelectProxy(it.name, selectedName)
 									},
 									onTestDelay = {
-										onTestGroupDelay(it.all)
+										// Only leaf nodes can be delay-tested; passing the
+										// nested group names makes clash answer with an
+										// error for every nested group.
+										onTestGroupDelay(
+											it.all.filter { option -> proxyTypesMap[option] != "Selector" },
+										)
 									},
 								)
 							}

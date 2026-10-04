@@ -39,6 +39,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -564,25 +565,31 @@ fun ProfileScreen(
 			Spacer(modifier = Modifier.height(8.dp))
 
 			// Display all profiles
+			// Keyed by profile id: without a stable key each card's remembered state
+			// (rename dialog text, open dropdown) follows the list position, so after
+			// deleting or re-activating a profile the neighbouring card would show the
+			// previous profile's name in its rename dialog.
 			vm.profiles.forEach { profile ->
-				ProfileCard(
-					profile = profile,
-					onActivate = { vm.activateProfile(context, profile) },
-					onDelete = { vm.deleteProfile(context, profile) },
-					onRename = { newName -> vm.renameProfile(context, profile, newName) },
-					onUpdate =
-						if (profile.type == ProfileType.REMOTE) {
-							{
-								updateProfile.value = profile
-								updateUserAgent.value = profile.userAgent ?: ""
-								updateProxyUrl.value = profile.proxyUrl ?: ""
-								showUpdateDialog.value = true
-							}
-						} else {
-							null
-						},
-					modifier = Modifier.fillMaxWidth(),
-				)
+				key(profile.id) {
+					ProfileCard(
+						profile = profile,
+						onActivate = { vm.activateProfile(context, profile) },
+						onDelete = { vm.deleteProfile(context, profile) },
+						onRename = { newName -> vm.renameProfile(context, profile, newName) },
+						onUpdate =
+							if (profile.type == ProfileType.REMOTE) {
+								{
+									updateProfile.value = profile
+									updateUserAgent.value = profile.userAgent ?: ""
+									updateProxyUrl.value = profile.proxyUrl ?: ""
+									showUpdateDialog.value = true
+								}
+							} else {
+								null
+							},
+						modifier = Modifier.fillMaxWidth(),
+					)
+				}
 			}
 
 			Spacer(modifier = Modifier.height(8.dp))
