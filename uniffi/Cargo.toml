@@ -21,6 +21,13 @@ codegen-units = 1
 panic = "unwind"
 strip = true
 
+# Referenced by core/build.gradle.kts ("release-dbg"): a release build that keeps
+# line tables so Rust panics produce symbolicated backtraces in logcat.
+[profile.release-dbg]
+inherits = "release"
+strip = "none"
+debug = "line-tables-only"
+
 [profile.detailed-release]
 inherits = "release"
 opt-level = 1
