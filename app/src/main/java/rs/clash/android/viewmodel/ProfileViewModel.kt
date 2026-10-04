@@ -1,5 +1,6 @@
 package rs.clash.android.viewmodel
 
+import android.app.Application
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -9,10 +10,11 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.edit
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import rs.clash.android.R
 import rs.clash.android.ui.snackbar.SnackbarController
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -35,7 +37,9 @@ data class FileInfo(
 	val size: Long = 0,
 )
 
-class ProfileViewModel : ViewModel() {
+class ProfileViewModel(
+	application: Application,
+) : AndroidViewModel(application) {
 	private val prefs = Global.application.getSharedPreferences("file_prefs", Context.MODE_PRIVATE)
 	var selectedFile by mutableStateOf<FileInfo?>(null)
 		private set
@@ -136,8 +140,12 @@ class ProfileViewModel : ViewModel() {
 		isImporting = true
 		return try {
 			val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
-			val fileName =
+			val rawName =
 				profileName ?: selectedFile?.name?.substringBeforeLast('.') ?: "profile_${System.currentTimeMillis()}"
+			// The name comes straight from the import dialog, so it has to be sanitised:
+			// without this a name like `../../shared_prefs/settings.xml` would create (and
+			// truncate) a file outside the app's files directory.
+			val fileName = sanitizeProfileFileName(rawName)
 			
 			// Create unique file name
 			val file = File(context.filesDir, fileName)
@@ -180,17 +188,43 @@ class ProfileViewModel : ViewModel() {
 			
 			saveProfiles()
 
-			SnackbarController.showMessage("配置文件导入成功")
+			SnackbarController.showMessage(
+				getApplication<Application>().getString(R.string.profile_import_success),
+			)
 			file.absolutePath
 		}  catch (e: EyreException) {
-			SnackbarController.showMessage("导入配置失败: ${formatEyreError(e)}")
+			SnackbarController.showMessage(
+				getApplication<Application>()
+					.getString(R.string.profile_import_failed, formatEyreError(e)),
+			)
 			null
 		} catch (e: Exception) {
 			val errorMessage = e.message ?: e.toString()
-			SnackbarController.showMessage("导入配置失败: $errorMessage")
+			SnackbarController.showMessage(
+				getApplication<Application>().getString(R.string.profile_import_failed, errorMessage),
+			)
 			null
 		} finally {
 			isImporting = false
+		}
+	}
+
+	/**
+	 * Turns an arbitrary user supplied profile name into a plain file name inside the
+	 * app's files directory: path separators and traversal segments are replaced, and
+	 * an empty result falls back to a generated name.
+	 */
+	private fun sanitizeProfileFileName(rawName: String): String {
+		val sanitized =
+			rawName
+				.trim()
+				.replace(Regex("[\\\\/:*?\"<>|\\x00-\\x1f]"), "_")
+				.trim('.', ' ')
+				.take(64)
+		return if (sanitized.isEmpty() || sanitized == "..") {
+			"profile_${System.currentTimeMillis()}"
+		} else {
+			sanitized
 		}
 	}
 
@@ -218,7 +252,9 @@ class ProfileViewModel : ViewModel() {
 			Global.profilePath = profiles[index].filePath
 			
 			saveProfiles()
-			SnackbarController.showMessage("已切换到配置: ${profile.name}")
+			SnackbarController.showMessage(
+				getApplication<Application>().getString(R.string.profile_activate_success, profile.name),
+			)
 		}
 	}
 
@@ -247,7 +283,9 @@ class ProfileViewModel : ViewModel() {
 		}
 		
 		saveProfiles()
-		SnackbarController.showMessage("配置已删除: ${profile.name}")
+		SnackbarController.showMessage(
+			getApplication<Application>().getString(R.string.profile_deleted, profile.name),
+		)
 	}
 
 	fun renameProfile(
@@ -262,7 +300,9 @@ class ProfileViewModel : ViewModel() {
 				activeProfile = profiles[index]
 			}
 			saveProfiles()
-			SnackbarController.showMessage("配置已重命名")
+			SnackbarController.showMessage(
+				getApplication<Application>().getString(R.string.profile_renamed),
+			)
 		}
 	}
 
@@ -275,7 +315,7 @@ class ProfileViewModel : ViewModel() {
 
 	fun verifyCurrentConfig(context: Context) {
 		if (savedFilePath == null) {
-			verificationResult = "未找到配置文件"
+			verificationResult = getApplication<Application>().getString(R.string.profile_not_found)
 			return
 		}
 
@@ -286,12 +326,12 @@ class ProfileViewModel : ViewModel() {
 			val (isValid, content) = verify(savedFilePath!!)
 			verificationResult =
 				if (isValid) {
-					"配置文件合法\n\n$content"
+					getApplication<Application>().getString(R.string.profile_verify_valid, content)
 				} else {
-					"配置文件不合法：$content"
+					getApplication<Application>().getString(R.string.profile_verify_failed, content)
 				}
 		} catch (e: Exception) {
-			verificationResult = "验证失败: ${e.message}"
+			verificationResult = e.message
 		} finally {
 			isVerifying = false
 		}
@@ -355,7 +395,13 @@ class ProfileViewModel : ViewModel() {
 						)
 					
 					if (!result.success) {
-						SnackbarController.showMessage(result.errorMessage ?: "未知错误")
+						SnackbarController.showMessage(
+							getApplication<Application>().getString(
+								R.string.profile_remote_add_failed,
+								result.errorMessage
+									?: getApplication<Application>().getString(R.string.profile_unknown_error),
+							),
+						)
 
 						return@withContext
 					}
@@ -364,7 +410,9 @@ class ProfileViewModel : ViewModel() {
 					val (isValid, _) = verify(file.absolutePath)
 					if (!isValid) {
 						file.delete()
-						SnackbarController.showMessage("配置文件验证失败，已删除")
+						SnackbarController.showMessage(
+							getApplication<Application>().getString(R.string.profile_remote_verify_failed_removed),
+						)
 						return@withContext
 					}
 					
@@ -398,13 +446,23 @@ class ProfileViewModel : ViewModel() {
 						}
 						
 						saveProfiles()
-						SnackbarController.showMessage("远程配置添加成功")
+						SnackbarController.showMessage(
+							getApplication<Application>().getString(R.string.profile_remote_added),
+						)
 					}
 				}
 			} catch (e: EyreException) {
-				SnackbarController.showMessage("添加远程配置失败: ${formatEyreError(e)}")
+				SnackbarController.showMessage(
+					getApplication<Application>()
+						.getString(R.string.profile_remote_add_failed, formatEyreError(e)),
+				)
 			} catch (e: Exception) {
-				SnackbarController.showMessage("添加远程配置失败: ${e.message ?: e.toString()}")
+				SnackbarController.showMessage(
+					getApplication<Application>().getString(
+						R.string.profile_remote_add_failed,
+						e.message ?: e.toString(),
+					),
+				)
 			} finally {
 				isDownloading = false
 				downloadProgress = null
@@ -419,7 +477,9 @@ class ProfileViewModel : ViewModel() {
 		proxyUrl: String? = null,
 	) {
 		if (profile.type != ProfileType.REMOTE || profile.url == null) {
-			SnackbarController.showMessage("只能更新远程配置")
+			SnackbarController.showMessage(
+				getApplication<Application>().getString(R.string.profile_update_remote_only),
+			)
 			return
 		}
 		
@@ -431,7 +491,7 @@ class ProfileViewModel : ViewModel() {
 					val file = File(profile.filePath)
 					// Download to a scratch file and only replace the profile once the
 					// payload was fetched *and* validated. Downloading straight onto
-					// `file` destroyed the last working configuration whenever the
+					// `file` used to destroy the last working configuration whenever the
 					// update failed halfway through or the new config was rejected.
 					val tempFile = File(file.parentFile, "${file.name}.download")
 					// Use provided parameters or fall back to profile's stored values
@@ -463,17 +523,31 @@ class ProfileViewModel : ViewModel() {
 							)
 						} catch (e: EyreException) {
 							tempFile.delete()
-							SnackbarController.showMessage("更新配置失败: ${formatEyreError(e)}")
+							SnackbarController.showMessage(
+								getApplication<Application>()
+									.getString(R.string.profile_remote_update_failed, formatEyreError(e)),
+							)
 							return@withContext
 						} catch (e: Exception) {
 							tempFile.delete()
-							SnackbarController.showMessage("更新配置失败: ${e.message ?: e.toString()}")
+							SnackbarController.showMessage(
+								getApplication<Application>().getString(
+									R.string.profile_remote_update_failed,
+									e.message ?: e.toString(),
+								),
+							)
 							return@withContext
 						}
 					
 					if (!result.success) {
 						tempFile.delete()
-						SnackbarController.showMessage("更新配置失败: ${result.errorMessage ?: "未知错误"}")
+						SnackbarController.showMessage(
+							getApplication<Application>().getString(
+								R.string.profile_remote_update_failed,
+								result.errorMessage
+									?: getApplication<Application>().getString(R.string.profile_unknown_error),
+							),
+						)
 						return@withContext
 					}
 					
@@ -481,24 +555,31 @@ class ProfileViewModel : ViewModel() {
 					val (isValid, error) = verify(tempFile.absolutePath)
 					if (!isValid) {
 						tempFile.delete()
-						SnackbarController.showMessage("配置文件验证失败: $error")
+						SnackbarController.showMessage(
+							getApplication<Application>()
+								.getString(R.string.profile_remote_verify_failed, error),
+						)
 						return@withContext
 					}
 					
-					// Promote the verified download to the real profile file: the scratch
-					// file lives in the same directory, so the rename cannot fail across
-					// filesystems and never leaves a half-written profile behind.
+					// Promote the verified download to the real profile file.
 					if (file.exists() && !file.delete()) {
 						tempFile.delete()
 						SnackbarController.showMessage(
-							"更新配置失败: cannot replace ${file.name}",
+							getApplication<Application>().getString(
+								R.string.profile_remote_update_failed,
+								"cannot replace ${file.name}",
+							),
 						)
 						return@withContext
 					}
 					if (!tempFile.renameTo(file)) {
 						tempFile.delete()
 						SnackbarController.showMessage(
-							"更新配置失败: cannot write ${file.name}",
+							getApplication<Application>().getString(
+								R.string.profile_remote_update_failed,
+								"cannot write ${file.name}",
+							),
 						)
 						return@withContext
 					}
@@ -518,13 +599,23 @@ class ProfileViewModel : ViewModel() {
 							saveProfiles()
 						}
 						
-						SnackbarController.showMessage("配置更新成功")
+						SnackbarController.showMessage(
+							getApplication<Application>().getString(R.string.profile_config_updated),
+						)
 					}
 				}
 			} catch (e: EyreException) {
-			SnackbarController.showMessage("添加远程配置失败: ${formatEyreError(e)}")
-		} catch (e: Exception) {
-			SnackbarController.showMessage("更新配置失败: ${e.message ?: e.toString()}")
+				SnackbarController.showMessage(
+					getApplication<Application>()
+						.getString(R.string.profile_remote_update_failed, formatEyreError(e)),
+				)
+			} catch (e: Exception) {
+				SnackbarController.showMessage(
+					getApplication<Application>().getString(
+						R.string.profile_remote_update_failed,
+						e.message ?: e.toString(),
+					),
+				)
 			} finally {
 				isDownloading = false
 				downloadProgress = null

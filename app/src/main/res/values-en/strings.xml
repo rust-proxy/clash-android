@@ -46,6 +46,10 @@
     <string name="timeout">Timeout</string>
     <string name="none">None</string>
     <string name="not_available">Not Available</string>
+    
+    
+    
+    
 
     <!-- Settings Screen -->
     <string name="settings_title">Settings</string>
@@ -115,6 +119,52 @@
     <string name="profile_update_proxy_configured">This update will use the configured HTTP proxy: %1$s</string>
     <string name="profile_update_proxy_clash">Clash is running. This update will use its HTTP proxy: %1$s</string>
     <string name="profile_update_proxy_none">Clash is not running. This update will not use an HTTP proxy.</string>
+    <string name="profile_import_success">Profile imported</string>
+    <string name="profile_import_failed">Failed to import profile: %1$s</string>
+    <string name="profile_activate_success">Switched to profile: %1$s</string>
+    <string name="profile_deleted">Profile deleted: %1$s</string>
+    <string name="profile_renamed">Profile renamed</string>
+    <string name="profile_not_found">No profile found</string>
+    <string name="profile_remote_added">Remote profile added</string>
+    <string name="profile_remote_add_failed">Failed to add remote profile: %1$s</string>
+    <string name="profile_remote_verify_failed">Profile validation failed: %1$s</string>
+    <string name="profile_remote_update_failed">Failed to update profile: %1$s</string>
+    <string name="profile_config_updated">Profile updated</string>
+    <string name="profile_unknown_error">Unknown error</string>
+    <string name="profile_verify_failed">Profile is invalid: %1$s</string>
+    <string name="profile_update_remote_only">Only remote profiles can be updated</string>
+    <string name="profile_verify_valid">Profile is valid\n\n%1$s</string>
     <string name="profile_remote_verify_failed_removed">Profile validation failed, the download was deleted</string>
+
+    <!-- Profile Screen (additional) -->
+    <string name="profile_add_remote">Add Remote Profile</string>
+    <string name="profile_config_name">Profile Name</string>
+    <string name="profile_subscription_url">Subscription URL</string>
+    <string name="profile_downloading">Downloading profile...</string>
+    <string name="profile_enter_config_name">Enter profile name</string>
+    <string name="profile_my_config">My Profiles</string>
+    <string name="profile_remote_config">Remote Profiles</string>
+    <string name="profile_local_config">Local Profiles</string>
+    <string name="profile_no_active">No active profile</string>
+    <string name="profile_auto_update">Enable auto update</string>
+    <string name="profile_ua_label">User-Agent (optional)</string>
+    <string name="profile_ua_placeholder">Custom browser user agent</string>
+    <string name="profile_proxy_label">HTTP Proxy (optional)</string>
+    <string name="profile_proxy_placeholder">http://proxy.example.com:8080</string>
+    <string name="profile_url_placeholder">https://example.com/config.yaml</string>
+    <string name="profile_name_placeholder">My Remote Profile</string>
+    <string name="profile_all_profiles">All profiles (%1$d)</string>
+    <string name="profile_update_config">Update Profile</string>
+    <string name="profile_set_active">Set as Active Profile</string>
+    <string name="profile_rename">Rename Profile</string>
+    <string name="profile_delete">Delete</string>
+    <string name="profile_verify_btn">Verify Configuration</string>
+    <string name="profile_active_config">Current Active Profile</string>
+
+    <!-- Known issues -->
+    <string name="known_issues_title">Known Issues</string>
+    <string name="known_issues_home">- clash-rs currently has some bugs with graceful shutdown; to stay correct, the app restarts itself automatically when the VPN is stopped.</string>
+    <string name="known_issues_profile">- clash-rs is not yet 100% compatible with mihomo configuration files, so you can verify a configuration file before applying it.\n- The app needs to be restarted after switching profiles.</string>
+    <string name="known_issues_settings">- Some settings only take effect after the VPN is restarted.</string>
 </resources>
 
