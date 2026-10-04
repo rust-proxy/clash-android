@@ -46,10 +46,10 @@
     <string name="timeout">Timeout</string>
     <string name="none">None</string>
     <string name="not_available">Not Available</string>
-    
-    
-    
-    
+    <string name="home_api_error">API error: %1$s</string>
+    <string name="home_stats_error">Failed to fetch statistics: %1$s</string>
+    <string name="home_select_profile_first">Please select a config file first</string>
+    <string name="home_select_proxy_failed">Failed to select proxy: %1$s</string>
 
     <!-- Settings Screen -->
     <string name="settings_title">Settings</string>
