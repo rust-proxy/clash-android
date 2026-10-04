@@ -429,6 +429,11 @@ class ProfileViewModel : ViewModel() {
 			try {
 				withContext(Dispatchers.IO) {
 					val file = File(profile.filePath)
+					// Download to a scratch file and only replace the profile once the
+					// payload was fetched *and* validated. Downloading straight onto
+					// `file` destroyed the last working configuration whenever the
+					// update failed halfway through or the new config was rejected.
+					val tempFile = File(file.parentFile, "${file.name}.download")
 					// Use provided parameters or fall back to profile's stored values
 					val effectiveUserAgent = userAgent ?: profile.userAgent
 					val effectiveProxyUrl = proxyUrl
@@ -448,23 +453,53 @@ class ProfileViewModel : ViewModel() {
 						}
 					
 					val result =
-						downloadFileWithProgress(
-							profile.url,
-							file.absolutePath,
-							effectiveUserAgent,
-							effectiveProxyUrl,
-							progressCallback,
-						)
+						try {
+							downloadFileWithProgress(
+								profile.url,
+								tempFile.absolutePath,
+								effectiveUserAgent,
+								effectiveProxyUrl,
+								progressCallback,
+							)
+						} catch (e: EyreException) {
+							tempFile.delete()
+							SnackbarController.showMessage("更新配置失败: ${formatEyreError(e)}")
+							return@withContext
+						} catch (e: Exception) {
+							tempFile.delete()
+							SnackbarController.showMessage("更新配置失败: ${e.message ?: e.toString()}")
+							return@withContext
+						}
 					
 					if (!result.success) {
+						tempFile.delete()
 						SnackbarController.showMessage("更新配置失败: ${result.errorMessage ?: "未知错误"}")
 						return@withContext
 					}
 					
-					// Verify the downloaded config
-					val (isValid, error) = verify(file.absolutePath)
+					// Verify the downloaded config before it replaces the current one
+					val (isValid, error) = verify(tempFile.absolutePath)
 					if (!isValid) {
+						tempFile.delete()
 						SnackbarController.showMessage("配置文件验证失败: $error")
+						return@withContext
+					}
+					
+					// Promote the verified download to the real profile file: the scratch
+					// file lives in the same directory, so the rename cannot fail across
+					// filesystems and never leaves a half-written profile behind.
+					if (file.exists() && !file.delete()) {
+						tempFile.delete()
+						SnackbarController.showMessage(
+							"更新配置失败: cannot replace ${file.name}",
+						)
+						return@withContext
+					}
+					if (!tempFile.renameTo(file)) {
+						tempFile.delete()
+						SnackbarController.showMessage(
+							"更新配置失败: cannot write ${file.name}",
+						)
 						return@withContext
 					}
 					

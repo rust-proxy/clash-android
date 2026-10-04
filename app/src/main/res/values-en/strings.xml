@@ -115,5 +115,6 @@
     <string name="profile_update_proxy_configured">This update will use the configured HTTP proxy: %1$s</string>
     <string name="profile_update_proxy_clash">Clash is running. This update will use its HTTP proxy: %1$s</string>
     <string name="profile_update_proxy_none">Clash is not running. This update will not use an HTTP proxy.</string>
+    <string name="profile_remote_verify_failed_removed">Profile validation failed, the download was deleted</string>
 </resources>
 

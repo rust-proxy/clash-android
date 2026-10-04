@@ -1,4 +1,5 @@
 use eyre::Context;
+use tokio::io::AsyncWriteExt;
 use tokio_stream::StreamExt;
 use tracing::{error, info};
 
@@ -102,19 +103,52 @@ pub async fn download_file_with_progress(
         });
     }
 
+    // Stream the body straight into a temporary file next to the destination
+    // instead of accumulating it in memory: a config can be several megabytes
+    // and buffering it whole can OOM an Android process. The temporary file is
+    // only renamed over `output_path` once every chunk arrived, so a failed or
+    // truncated download cannot clobber a config that is still in use.
+    let destination = std::path::Path::new(&output_path);
+    let temp_path = match destination.file_name() {
+        Some(name) => {
+            let mut temp_name = std::ffi::OsString::from(".");
+            temp_name.push(name);
+            temp_name.push(format!(".{}.part", std::process::id()));
+            destination.with_file_name(temp_name)
+        }
+        None => {
+            return Ok(DownloadResult {
+                success: false,
+                file_size: 0,
+                error_message: Some(format!("Invalid output path: {output_path}")),
+            });
+        }
+    };
+
+    let mut file = tokio::fs::File::create(&temp_path)
+        .await
+        .context(format!("Failed to create file: {}", temp_path.display()))?;
+
     // Download with progress tracking
     let mut stream = response.bytes_stream();
     let mut downloaded: u64 = 0;
-    let mut buffer = Vec::new();
 
     while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|e| eyre::eyre!("Failed to read chunk: {}", e))?;
-        buffer.extend_from_slice(&chunk);
+        let chunk = match chunk {
+            Ok(chunk) => chunk,
+            Err(e) => {
+                drop(file);
+                _ = tokio::fs::remove_file(&temp_path).await;
+                return Err(eyre::eyre!("Failed to read chunk: {}", e));
+            }
+        };
+        file.write_all(&chunk)
+            .await
+            .context(format!("Failed to write to file: {}", temp_path.display()))?;
         downloaded += chunk.len() as u64;
 
         // Report progress
         if let Some(ref callback) = progress_callback {
-            info!("Progress: {}/{} bytes", downloaded, total_size);
             callback.on_progress(DownloadProgress {
                 downloaded,
                 total: total_size,
@@ -122,15 +156,25 @@ pub async fn download_file_with_progress(
         }
     }
 
-    // Create output file and write
-    _ = tokio::fs::File::create(&output_path)
+    file.flush()
         .await
-        .context(format!("Failed to create file: {output_path}"))?;
-    tokio::fs::write(&output_path, &buffer)
+        .context(format!("Failed to flush file: {}", temp_path.display()))?;
+    file.sync_all()
         .await
-        .context(format!("Failed to write to file: {output_path}"))?;
+        .context(format!("Failed to sync file: {}", temp_path.display()))?;
+    drop(file);
 
-    let file_size = buffer.len() as u64;
+    if let Err(e) = tokio::fs::rename(&temp_path, destination).await {
+        _ = tokio::fs::remove_file(&temp_path).await;
+        return Err(eyre::eyre!(
+            "Failed to move {} to {}: {}",
+            temp_path.display(),
+            output_path,
+            e
+        ));
+    }
+
+    let file_size = downloaded;
     info!(
         "Download completed: {} bytes written to {}",
         file_size, output_path

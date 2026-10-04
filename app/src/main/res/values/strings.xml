@@ -143,6 +143,7 @@
     <string name="profile_remote_added">远程配置添加成功</string>
     <string name="profile_remote_add_failed">添加远程配置失败: %1$s</string>
     <string name="profile_remote_verify_failed">配置文件验证失败: %1$s</string>
+    <string name="profile_remote_verify_failed_removed">配置文件验证失败，已删除</string>
     <string name="profile_remote_update_failed">更新配置失败: %1$s</string>
     <string name="profile_config_updated">配置更新成功</string>
     <string name="profile_set_active">设为活动配置</string>
