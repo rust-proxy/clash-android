@@ -11,7 +11,7 @@ version = "0.1.0"
 edition = "2024"
 
 [workspace.dependencies]
-uniffi = { version = "0.31", features = ["tokio"] }
+uniffi = { version = "0.32.2", features = ["tokio"] }
 async-compat = "0.2.5"
 
 [profile.release]
@@ -50,6 +50,10 @@ strip = "debuginfo"
 opt-level = 3
 
 [patch.crates-io]
+# The custom-runtime-builder branch supplies set_runtime_builder for Android.
 async-compat = { git = "https://github.com/element-hq/async-compat", rev = "5a27c8b290f1f1dcfc0c4ec22c464e38528aa591" }
-rustls = { git = "https://github.com/Watfaq/rustls.git", branch = "watfaq/0.23.40" }
+rustls = { git = "https://github.com/Watfaq/rustls.git", branch = "watfaq/0.23.45" }
 tokio-rustls = { git = "https://github.com/Watfaq/tokio-rustls.git", branch = "watfaq/0.26.4" }
+# ts_netmon 0.6.1 unconditionally exports PlatformMon on Android/iOS.
+# Match clash-rs's fix until a corrected tailscale release is available.
+ts_netmon = { git = "https://github.com/tailscale/tailscale-rs.git", rev = "2c67f76eab" }

@@ -19,20 +19,21 @@
             };
           };
         };
-        buildToolsVersion = "35.0.0";
-        ndkVersion = "29.0.14206865";
+        buildToolsVersion = "37.0.0";
+        ndkVersion = "30.0.16248370";
         androidComposition = pkgs.androidenv.composeAndroidPackages {
-          buildToolsVersions = [ buildToolsVersion "34.0.0" ]; # 可以放多个版本
-          platformVersions = [ "35" "34" ];
+          buildToolsVersions = [ buildToolsVersion ];
+          platformVersions = [ "37" ];
           abiVersions = [ "x86_64" "arm64-v8a" ];
           includeNDK = true;
+          ndkVersions = [ ndkVersion ];
           useGoogleAPIs = false;
           useGoogleTVAddOns = false;
           includeEmulator = false;
           includeSystemImages = false;
           includeSources = false;
         };
-        pinnedJDK = pkgs.jdk21;
+        pinnedJDK = pkgs.jdk25;
         androidSdk = androidComposition.androidsdk;
         libraries = [pkgs.libclang];
       in {

@@ -309,7 +309,9 @@ async fn run_clash(
     let handle: JoinHandle<eyre::Result<()>> = tokio::spawn(async move {
         let (log_tx, _) = tokio::sync::broadcast::channel(100);
         info!("Starting clash-rs");
-        let start_result = start(config, work_dir, log_tx, token.child_token());
+        // Android owns config loading and applies TUN/DNS overrides above.
+        // Do not let the controller reload the unmodified profile implicitly.
+        let start_result = start(config, work_dir, None, log_tx, token.child_token());
         tokio::select! {
             result = start_result => {
                 if let Err(err) = result {
