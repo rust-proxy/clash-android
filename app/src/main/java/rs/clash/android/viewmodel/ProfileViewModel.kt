@@ -14,13 +14,13 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import rs.clash.android.R
-import rs.clash.android.ui.snackbar.SnackbarController
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import rs.clash.android.Global
+import rs.clash.android.R
 import rs.clash.android.model.Profile
 import rs.clash.android.model.ProfileType
+import rs.clash.android.ui.snackbar.SnackbarController
 import uniffi.clash_android_ffi.DownloadProgress
 import uniffi.clash_android_ffi.DownloadProgressCallback
 import uniffi.clash_android_ffi.EyreException
@@ -192,7 +192,7 @@ class ProfileViewModel(
 				getApplication<Application>().getString(R.string.profile_import_success),
 			)
 			file.absolutePath
-		}  catch (e: EyreException) {
+		} catch (e: EyreException) {
 			SnackbarController.showMessage(
 				getApplication<Application>()
 					.getString(R.string.profile_import_failed, formatEyreError(e)),
@@ -496,11 +496,12 @@ class ProfileViewModel(
 					val tempFile = File(file.parentFile, "${file.name}.download")
 					// Use provided parameters or fall back to profile's stored values
 					val effectiveUserAgent = userAgent ?: profile.userAgent
-					val effectiveProxyUrl = proxyUrl
-						?: profile.proxyUrl
-						?: Global.clashInstance?.mixedPort()?.let { port ->
-							"http://127.0.0.1:$port"
-						}
+					val effectiveProxyUrl =
+						proxyUrl
+							?: profile.proxyUrl
+							?: Global.clashInstance?.mixedPort()?.let { port ->
+								"http://127.0.0.1:$port"
+							}
 					
 					// Progress callback - update on main thread
 					val progressCallback =

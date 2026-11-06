@@ -28,7 +28,6 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -46,24 +45,33 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.annotation.RootGraph
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
+import kotlinx.coroutines.launch
 import rs.clash.android.R
-import rs.clash.android.viewmodel.HomeViewModel
-import uniffi.clash_android_ffi.Proxy
+import rs.clash.android.data.ProxyInfo
+import rs.clash.android.ui.snackbar.SnackbarController.Companion.showMessage
+import rs.clash.android.viewmodel.PanelAction
+import rs.clash.android.viewmodel.PanelUiState
+import rs.clash.android.viewmodel.PanelViewModel
+import rs.clash.android.viewmodel.ProxyDelay
 
 // Constants
 private const val DELAY_EXCELLENT_MS = 300
@@ -76,14 +84,26 @@ private const val PROXY_COLUMNS = 2
 fun PanelScreen(
 	navigator: DestinationsNavigator,
 	modifier: Modifier = Modifier,
-	viewModel: HomeViewModel = viewModel(),
+	viewModel: PanelViewModel = viewModel(),
 ) {
+	val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+	val context = LocalContext.current
+	val lifecycleOwner = LocalLifecycleOwner.current
+	LaunchedEffect(viewModel, lifecycleOwner) {
+		lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+			launch { viewModel.observe() }
+			launch {
+				viewModel.effects.collect { showMessage(context.getString(it.resource, it.detail)) }
+			}
+		}
+	}
+
 	Scaffold(
 		topBar = {
 			TopAppBar(
 				title = { Text(stringResource(R.string.panel_screen)) },
 				actions = {
-					IconButton(onClick = { viewModel.fetchProxies() }) {
+					IconButton(onClick = { viewModel.onAction(PanelAction.Refresh) }) {
 						Icon(
 							imageVector = Icons.Default.Refresh,
 							contentDescription = stringResource(R.string.refresh),
@@ -94,17 +114,10 @@ fun PanelScreen(
 			)
 		},
 	) { padding ->
-		val proxies = viewModel.proxies
-		val isRefreshing = viewModel.isRefreshing
-		val delays = viewModel.delays
-
 		ProxyTab(
-			proxies = proxies,
-			isRefreshing = isRefreshing,
-			delays = delays,
-			onFetchProxies = { viewModel.fetchProxies() },
-			onSelectProxy = { groupName, proxyName -> viewModel.selectProxy(groupName, proxyName) },
-			onTestGroupDelay = { proxies -> viewModel.testGroupDelay(proxies) },
+			state = uiState,
+			onSelectProxy = { groupName, proxyName -> viewModel.onAction(PanelAction.SelectProxy(groupName, proxyName)) },
+			onTestGroupDelay = { group -> viewModel.onAction(PanelAction.TestGroupDelay(group)) },
 			modifier = Modifier.padding(padding).fillMaxSize(),
 		)
 	}
@@ -112,22 +125,14 @@ fun PanelScreen(
 
 @Composable
 private fun ProxyTab(
-	proxies: Array<Proxy>,
-	isRefreshing: Boolean,
-	delays: Map<String, String>,
-	onFetchProxies: () -> Unit,
+	state: PanelUiState,
 	onSelectProxy: (String, String) -> Unit,
-	onTestGroupDelay: (List<String>) -> Unit,
+	onTestGroupDelay: (String) -> Unit,
 	modifier: Modifier = Modifier,
 ) {
-	val currentOnFetchProxies by rememberUpdatedState(onFetchProxies)
-
-	LaunchedEffect(Unit) {
-		if (proxies.isEmpty()) {
-			currentOnFetchProxies()
-		}
-	}
-
+	val proxies = state.proxies
+	val isRefreshing = state.isRefreshing
+	val delays = state.delays
 	Box(modifier = modifier.fillMaxSize()) {
 		when {
 			proxies.isEmpty() && !isRefreshing -> {
@@ -143,14 +148,8 @@ private fun ProxyTab(
 				}
 			}
 			else -> {
-				val proxyTypesMap =
-					remember(proxies) {
-						proxies.associate { it.name to it.proxyType }
-					}
-				val groups =
-					remember(proxies) {
-						proxies.filter { it.all.isNotEmpty() }.toList()
-					}
+				val proxyTypesMap = remember(proxies) { state.proxyTypes }
+				val groups = remember(proxies) { state.groups }
 
 				if (groups.isNotEmpty()) {
 					LazyColumn(
@@ -173,12 +172,7 @@ private fun ProxyTab(
 										onSelectProxy(it.name, selectedName)
 									},
 									onTestDelay = {
-										// Only leaf nodes can be delay-tested; passing the
-										// nested group names makes clash answer with an
-										// error for every nested group.
-										onTestGroupDelay(
-											it.all.filter { option -> proxyTypesMap[option] != "Selector" },
-										)
+										onTestGroupDelay(it.name)
 									},
 								)
 							}
@@ -221,8 +215,8 @@ private fun ProxyTab(
 @Composable
 private fun ProxyGroupWidget(
 	name: String,
-	proxy: Proxy,
-	delays: Map<String, String>,
+	proxy: ProxyInfo,
+	delays: Map<String, ProxyDelay>,
 	proxyTypes: Map<String, String>,
 	onSelect: (String) -> Unit,
 	modifier: Modifier = Modifier,
@@ -352,7 +346,7 @@ private fun ProxyGroupWidget(
 private fun ProxyItem(
 	option: String,
 	isSelected: Boolean,
-	delay: String?,
+	delay: ProxyDelay?,
 	type: String?,
 	onSelect: () -> Unit,
 	modifier: Modifier = Modifier,
@@ -423,21 +417,21 @@ private fun ProxyItem(
 					val timeoutText = stringResource(R.string.timeout)
 					val displayedDelay =
 						when (delay) {
-							"testing..." -> testingText
-							"timeout" -> timeoutText
-							else -> delay
+							ProxyDelay.Testing -> testingText
+							ProxyDelay.Timeout -> timeoutText
+							is ProxyDelay.Measured -> "${delay.millis}ms"
 						}
 					val delayColor =
 						when {
-							delay.contains("ms") -> {
-								val ms = delay.replace("ms", "").trim().toIntOrNull() ?: 0
+							delay is ProxyDelay.Measured -> {
+								val ms = delay.millis
 								when {
 									ms < DELAY_EXCELLENT_MS -> Color(0xFF4CAF50) // Green
 									ms < DELAY_GOOD_MS -> Color(0xFFFFC107) // Amber
 									else -> Color(0xFFF44336) // Red
 								}
 							}
-							delay == "testing..." || delay == testingText -> MaterialTheme.colorScheme.outline
+							delay == ProxyDelay.Testing -> MaterialTheme.colorScheme.outline
 							else -> MaterialTheme.colorScheme.error
 						}
 

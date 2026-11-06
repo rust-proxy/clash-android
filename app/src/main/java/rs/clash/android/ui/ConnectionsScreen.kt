@@ -39,6 +39,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.annotation.RootGraph
@@ -58,6 +62,14 @@ fun ConnectionsScreen(
 	modifier: Modifier = Modifier,
 	viewModel: ConnectionsViewModel = viewModel(),
 ) {
+	val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+	val lifecycleOwner = LocalLifecycleOwner.current
+	LaunchedEffect(viewModel, lifecycleOwner) {
+		lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+			viewModel.observe()
+		}
+	}
+
 	Scaffold(
 		topBar = {
 			TopAppBar(
@@ -77,10 +89,10 @@ fun ConnectionsScreen(
 		},
 	) { padding ->
 		ConnectionsContent(
-			connections = viewModel.connections,
-			downloadTotal = viewModel.downloadTotal,
-			uploadTotal = viewModel.uploadTotal,
-			errorMessage = viewModel.errorMessage,
+			connections = uiState.connections,
+			downloadTotal = uiState.downloadTotal,
+			uploadTotal = uiState.uploadTotal,
+			errorMessage = uiState.errorMessage,
 			modifier = Modifier.padding(padding).fillMaxSize(),
 		)
 	}

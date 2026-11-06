@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,17 +36,25 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.annotation.RootGraph
 import com.ramcosta.composedestinations.generated.destinations.ConnectionsScreenDestination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
+import kotlinx.coroutines.launch
 import rs.clash.android.R
+import rs.clash.android.data.MemoryUsage
 import rs.clash.android.formatSize
 import rs.clash.android.ui.components.StatsCard
 import rs.clash.android.ui.components.TextInfoDialog
+import rs.clash.android.ui.snackbar.SnackbarController.Companion.showMessage
+import rs.clash.android.viewmodel.HomeAction
+import rs.clash.android.viewmodel.HomeEffect
 import rs.clash.android.viewmodel.HomeViewModel
-import uniffi.clash_android_ffi.MemoryResponse
 
 @Destination<RootGraph>(start = true)
 @OptIn(ExperimentalMaterial3Api::class)
@@ -63,13 +72,32 @@ fun HomeScreen(
 		rememberLauncherForActivityResult(
 			contract = ActivityResultContracts.StartActivityForResult(),
 			onResult = { result ->
-				if (result.resultCode == RESULT_OK) {
-					viewModel.startVpn()
-				}
+				viewModel.onAction(HomeAction.PermissionResult(result.resultCode == RESULT_OK))
 			},
 		)
 
-	val isVpnRunning = viewModel.isVpnRunning
+	val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+	val isVpnRunning = uiState.isVpnRunning
+	val lifecycleOwner = LocalLifecycleOwner.current
+	LaunchedEffect(viewModel, lifecycleOwner) {
+		lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+			launch { viewModel.observe() }
+		}
+	}
+	LaunchedEffect(viewModel, lifecycleOwner, vpnPermissionLauncher) {
+		lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+			viewModel.effects.collect { effect ->
+				when (effect) {
+					is HomeEffect.RequestVpnPermission -> vpnPermissionLauncher.launch(effect.intent)
+					is HomeEffect.Message ->
+						showMessage(
+							if (effect.detail == null) context.getString(effect.resource) else context.getString(effect.resource, effect.detail),
+						)
+					HomeEffect.RestartApp -> restartApp(context)
+				}
+			}
+		}
+	}
 
 	// Restart confirmation dialog
 	if (showRestartDialog) {
@@ -81,11 +109,7 @@ fun HomeScreen(
 				TextButton(
 					onClick = {
 						showRestartDialog = false
-						// Restart the app
-						val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-						intent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
-						context.startActivity(intent)
-						android.os.Process.killProcess(android.os.Process.myPid())
+						restartApp(context)
 					},
 				) {
 					Text(stringResource(R.string.confirm))
@@ -131,10 +155,10 @@ fun HomeScreen(
 			)
 		},
 	) { padding ->
-		val memory = viewModel.memoryUsage
-		val connections = viewModel.connectionCount
-		val download = viewModel.totalDownload
-		val upload = viewModel.totalUpload
+		val memory = uiState.overview.memory
+		val connections = uiState.overview.connectionCount
+		val download = uiState.overview.downloadTotal
+		val upload = uiState.overview.uploadTotal
 
 		OverviewTab(
 			memory = memory,
@@ -143,16 +167,7 @@ fun HomeScreen(
 			upload = upload,
 			isVpnRunning = isVpnRunning,
 			onVpnToggle = {
-				if (isVpnRunning) {
-					viewModel.stopVpn()
-					// Restart the app when VPN is stopped
-					val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-					intent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
-					context.startActivity(intent)
-					android.os.Process.killProcess(android.os.Process.myPid())
-				} else {
-					viewModel.startVpn(vpnPermissionLauncher)
-				}
+				viewModel.onAction(if (isVpnRunning) HomeAction.StopVpn else HomeAction.StartVpn)
 			},
 			onConnectionsClick = {
 				navigator.navigate(ConnectionsScreenDestination)
@@ -164,7 +179,7 @@ fun HomeScreen(
 
 @Composable
 fun OverviewTab(
-	memory: MemoryResponse?,
+	memory: MemoryUsage?,
 	connections: Int,
 	download: Long,
 	upload: Long,
@@ -238,4 +253,11 @@ fun OverviewTab(
 
 		item { Spacer(modifier = Modifier.height(16.dp)) }
 	}
+}
+
+private fun restartApp(context: android.content.Context) {
+	val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+	intent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
+	context.startActivity(intent)
+	android.os.Process.killProcess(android.os.Process.myPid())
 }

@@ -1,78 +1,67 @@
 package rs.clash.android.viewmodel
 
-import android.util.Log
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.update
 import rs.clash.android.Global
-import uniffi.clash_android_ffi.ClashController
+import rs.clash.android.data.AppData
+import rs.clash.android.data.ConnectionsRepository
 import uniffi.clash_android_ffi.Connection
 
-class ConnectionsViewModel : ViewModel() {
-	private val controller by lazy { ClashController("${Global.application.cacheDir}/clash.sock") }
-	private var pollingJob: Job? = null
+data class ConnectionsUiState(
+	val connections: List<Connection> = emptyList(),
+	val downloadTotal: Long = 0,
+	val uploadTotal: Long = 0,
+	val isRefreshing: Boolean = false,
+	val errorMessage: String? = null,
+)
 
-	var connections by mutableStateOf<List<Connection>>(emptyList())
-		private set
+class ConnectionsViewModel(
+	private val repository: ConnectionsRepository = AppData.core,
+	private val running: StateFlow<Boolean> = Global.isServiceRunning,
+) : ViewModel() {
+	private val state = MutableStateFlow(ConnectionsUiState())
+	val uiState = state.asStateFlow()
 
-	var downloadTotal by mutableLongStateOf(0)
-		private set
-
-	var uploadTotal by mutableLongStateOf(0)
-		private set
-
-	var isRefreshing by mutableStateOf(false)
-		private set
-
-	var errorMessage by mutableStateOf<String?>(null)
-		private set
-
-	init {
-		startPolling()
-	}
-
-	private fun startPolling() {
-		pollingJob = viewModelScope.launch(Dispatchers.Default) {
-			while (isActive) {
-				// The controller talks to clash's unix socket, so there is nothing to
-				// poll (and nothing to report) while the VPN is down.
-				if (Global.isServiceRunning.value) {
-					fetchConnections()
-				}
-				delay(2000)
+	/** The destination lifecycle owns polling and cancels in-flight requests when hidden. */
+	suspend fun observe() {
+		try {
+			running.collectLatest { enabled ->
+				state.value = ConnectionsUiState()
+				if (enabled) pollWhileServiceRunning(running, 2000, refresh = ::fetchConnections)
 			}
+		} finally {
+			// A retained navigation entry should not retain the entire connection snapshot.
+			state.value = ConnectionsUiState()
 		}
 	}
 
-	override fun onCleared() {
-		super.onCleared()
-		pollingJob?.cancel()
-	}
-
-	fun fetchConnections() {
-		isRefreshing = true
-		errorMessage = null
-		viewModelScope.launch {
-			try {
-				val response = controller.getConnections()
-				connections = response.connections
-				downloadTotal = response.downloadTotal
-				uploadTotal = response.uploadTotal
-			} catch (e: Exception) {
-				Log.e("ConnectionsAPI", "Failed to fetch connections", e)
-				errorMessage = "Failed to load connections: ${e.message}"
-				connections = emptyList()
-			} finally {
-				isRefreshing = false
-			}
+	private suspend fun fetchConnections() {
+		state.update { it.copy(isRefreshing = true, errorMessage = null) }
+		try {
+			val response = repository.getConnections()
+			currentCoroutineContext().ensureActive()
+			if (!running.value) return
+			state.value =
+				ConnectionsUiState(
+					connections = response.connections,
+					downloadTotal = response.downloadTotal,
+					uploadTotal = response.uploadTotal,
+				)
+		} catch (e: CancellationException) {
+			throw e
+		} catch (e: Exception) {
+			currentCoroutineContext().ensureActive()
+			if (!running.value) return
+			state.update { it.copy(connections = emptyList(), errorMessage = e.message ?: e.toString()) }
+		} finally {
+			state.update { it.copy(isRefreshing = false) }
 		}
 	}
 }
