@@ -28,6 +28,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import rs.clash.android.data.ConnectionsRepository
+import rs.clash.android.data.MemoryUsage
 import rs.clash.android.data.Overview
 import rs.clash.android.data.OverviewRepository
 import rs.clash.android.data.ProxyInfo
@@ -38,6 +39,7 @@ import rs.clash.android.viewmodel.ConnectionsUiState
 import rs.clash.android.viewmodel.ConnectionsViewModel
 import rs.clash.android.viewmodel.HomeAction
 import rs.clash.android.viewmodel.HomeEffect
+import rs.clash.android.viewmodel.HomeUiState
 import rs.clash.android.viewmodel.HomeViewModel
 import rs.clash.android.viewmodel.PanelAction
 import rs.clash.android.viewmodel.PanelUiState
@@ -65,6 +67,149 @@ class PageStateTest {
 		repository: ProxyRepository,
 		running: MutableStateFlow<Boolean> = MutableStateFlow(true),
 	): PanelViewModel = PanelViewModel(repository, running).also { viewModels.put("panel-${panelCount++}", it) }
+
+	private fun home(
+		repository: OverviewRepository,
+		vpn: FakeVpn = FakeVpn().apply { running.value = true },
+	): HomeViewModel = HomeViewModel(repository, vpn).also { viewModels.put("home", it) }
+
+	@Test
+	fun returningHomePreservesOverviewAndRefreshesImmediatelyWithoutHiddenPolling() =
+		runTest {
+			val cached = Overview(MemoryUsage(1234, 4096), 7, 8000, 9000)
+			val updated = cached.copy(connectionCount = 8, downloadTotal = 10000)
+			val release = CompletableDeferred<Unit>()
+			var calls = 0
+			val home =
+				home(
+					object : OverviewRepository {
+						override suspend fun getOverview(): Overview {
+							calls++
+							if (calls == 1) return cached
+							release.await()
+							return updated
+						}
+					},
+				)
+			val first = backgroundScope.launch { home.observe() }
+			advanceTimeBy(1000)
+			runCurrent()
+			assertEquals(cached, home.uiState.value.overview)
+			first.cancelAndJoin()
+			advanceTimeBy(6000)
+			runCurrent()
+			assertEquals(1, calls)
+			val returned = backgroundScope.launch { home.observe() }
+			runCurrent()
+			assertEquals(2, calls)
+			assertEquals(cached, home.uiState.value.overview)
+			release.complete(Unit)
+			runCurrent()
+			assertEquals(updated, home.uiState.value.overview)
+			advanceTimeBy(2999)
+			runCurrent()
+			assertEquals(2, calls)
+			advanceTimeBy(1)
+			runCurrent()
+			assertEquals(3, calls)
+			returned.cancelAndJoin()
+		}
+
+	@Test
+	fun hiddenHomeDiscardsLateResponseAndKeepsLastSnapshot() =
+		runTest {
+			val cached = Overview(connectionCount = 7)
+			val release = CompletableDeferred<Unit>()
+			var calls = 0
+			val home =
+				home(
+					object : OverviewRepository {
+						override suspend fun getOverview(): Overview {
+							if (++calls == 1) return cached
+							withContext(NonCancellable) { release.await() }
+							return Overview(connectionCount = 99)
+						}
+					},
+				)
+			val first = backgroundScope.launch { home.observe() }
+			advanceTimeBy(1000)
+			runCurrent()
+			first.cancelAndJoin()
+			val returned = backgroundScope.launch { home.observe() }
+			try {
+				runCurrent()
+				assertEquals(2, calls)
+				returned.cancel()
+				release.complete(Unit)
+				returned.join()
+				assertEquals(cached, home.uiState.value.overview)
+			} finally {
+				release.complete(Unit)
+				returned.cancelAndJoin()
+			}
+		}
+
+	@Test
+	fun hiddenHomeInvalidatesOverviewAcrossVpnSessions() =
+		runTest {
+			val vpn = FakeVpn().apply { running.value = true }
+			var calls = 0
+			val home =
+				home(
+					object : OverviewRepository {
+						override suspend fun getOverview(): Overview = Overview(connectionCount = ++calls)
+					},
+					vpn,
+				)
+			val first = backgroundScope.launch { home.observe() }
+			advanceTimeBy(1000)
+			runCurrent()
+			assertEquals(1, home.uiState.value.overview.connectionCount)
+			first.cancelAndJoin()
+			vpn.running.value = false
+			runCurrent()
+			assertEquals(HomeUiState(), home.uiState.value)
+			vpn.running.value = true
+			runCurrent()
+			assertEquals(HomeUiState(isVpnRunning = true), home.uiState.value)
+			assertEquals(1, calls)
+			val returned = backgroundScope.launch { home.observe() }
+			runCurrent()
+			assertEquals(1, calls)
+			advanceTimeBy(1000)
+			runCurrent()
+			assertEquals(2, home.uiState.value.overview.connectionCount)
+			returned.cancelAndJoin()
+		}
+
+	@Test
+	fun failedHomeRefreshAfterTabSwitchKeepsSnapshotAndPollingRecovers() =
+		runTest {
+			val cached = Overview(connectionCount = 7, downloadTotal = 8000)
+			var calls = 0
+			val home =
+				home(
+					object : OverviewRepository {
+						override suspend fun getOverview(): Overview {
+							check(++calls != 2) { "controller unavailable" }
+							return if (calls == 1) cached else cached.copy(connectionCount = 9)
+						}
+					},
+				)
+			val first = backgroundScope.launch { home.observe() }
+			advanceTimeBy(1000)
+			runCurrent()
+			first.cancelAndJoin()
+			val returned = backgroundScope.launch { home.observe() }
+			runCurrent()
+			assertEquals(2, calls)
+			assertEquals(cached, home.uiState.value.overview)
+			assertTrue(home.effects.first() is HomeEffect.Message)
+			advanceTimeBy(3000)
+			runCurrent()
+			assertEquals(9, home.uiState.value.overview.connectionCount)
+			returned.cancelAndJoin()
+		}
 
 	@Test
 	fun firstPanelFrameIsLoadingAndReadyControllerLoadsWithoutDelay() =
@@ -322,7 +467,7 @@ class PageStateTest {
 	fun deniedPermissionDoesNotStartVpnAndApprovedPermissionRechecksTheProfile() =
 		runBlocking {
 			val vpn = FakeVpn()
-			val home = HomeViewModel(FakeOverview(), vpn)
+			val home = home(FakeOverview(), vpn)
 			home.onAction(HomeAction.PermissionResult(false))
 			assertEquals(0, vpn.starts)
 			vpn.result = VpnStartResult.MissingProfile
@@ -349,7 +494,7 @@ class PageStateTest {
 						}
 					}
 				val vpn = FakeVpn().apply { running.value = true }
-				val home = HomeViewModel(repository, vpn)
+				val home = home(repository, vpn)
 				val observing = launch { home.observe() }
 				try {
 					started.await()
