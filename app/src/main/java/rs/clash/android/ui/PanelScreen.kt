@@ -131,11 +131,11 @@ private fun ProxyTab(
 	modifier: Modifier = Modifier,
 ) {
 	val proxies = state.proxies
-	val isRefreshing = state.isRefreshing
+	val isLoading = state.isLoading
 	val delays = state.delays
 	Box(modifier = modifier.fillMaxSize()) {
 		when {
-			proxies.isEmpty() && !isRefreshing -> {
+			proxies.isEmpty() && !isLoading -> {
 				Box(
 					modifier = Modifier.fillMaxSize(),
 					contentAlignment = Alignment.Center,
@@ -185,7 +185,7 @@ private fun ProxyTab(
 		}
 
 		// Loading indicator overlay
-		if (isRefreshing) {
+		if (isLoading) {
 			Card(
 				modifier =
 					Modifier

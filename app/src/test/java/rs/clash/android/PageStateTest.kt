@@ -1,6 +1,9 @@
 package rs.clash.android
 
+import androidx.lifecycle.ViewModelStore
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
@@ -9,12 +12,20 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import rs.clash.android.data.ConnectionsRepository
 import rs.clash.android.data.Overview
@@ -34,7 +45,201 @@ import rs.clash.android.viewmodel.PanelViewModel
 import rs.clash.android.viewmodel.ProxyDelay
 import uniffi.clash_android_ffi.ConnectionsResponse
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class PageStateTest {
+	private val viewModels = ViewModelStore()
+	private var panelCount = 0
+
+	@Before
+	fun setUp() {
+		Dispatchers.setMain(UnconfinedTestDispatcher())
+	}
+
+	@After
+	fun tearDown() {
+		viewModels.clear()
+		Dispatchers.resetMain()
+	}
+
+	private fun panel(
+		repository: ProxyRepository,
+		running: MutableStateFlow<Boolean> = MutableStateFlow(true),
+	): PanelViewModel = PanelViewModel(repository, running).also { viewModels.put("panel-${panelCount++}", it) }
+
+	@Test
+	fun firstPanelFrameIsLoadingAndReadyControllerLoadsWithoutDelay() =
+		runTest {
+			val repository = FakeProxies()
+			val panel = panel(repository)
+			assertTrue(panel.uiState.value.isLoading)
+			val observing = backgroundScope.launch { panel.observe() }
+			runCurrent()
+			assertEquals(1, repository.loads)
+			assertTrue(
+				panel.uiState.value.proxies
+					.isNotEmpty(),
+			)
+			assertFalse(panel.uiState.value.isLoading)
+			observing.cancelAndJoin()
+		}
+
+	@Test
+	fun returningPanelKeepsCachedProxiesAndDiscardsCancelledRefreshResults() =
+		runTest {
+			val release = CompletableDeferred<Unit>()
+			val repository =
+				object : FakeProxies() {
+					override suspend fun getProxies(): List<ProxyInfo> {
+						val proxies = super.getProxies()
+						if (loads == 1) return proxies
+						withContext(NonCancellable) { release.await() }
+						return emptyList()
+					}
+				}
+			val panel = panel(repository)
+			val first = backgroundScope.launch { panel.observe() }
+			runCurrent()
+			val cached = panel.uiState.value
+			first.cancelAndJoin()
+			assertEquals(cached, panel.uiState.value)
+			val returned = backgroundScope.launch { panel.observe() }
+			try {
+				runCurrent()
+				assertEquals(2, repository.loads)
+				assertEquals(cached.proxies, panel.uiState.value.proxies)
+				assertTrue(panel.uiState.value.isRefreshing)
+				returned.cancel()
+				release.complete(Unit)
+				returned.join()
+				assertEquals(cached, panel.uiState.value)
+			} finally {
+				release.complete(Unit)
+				returned.cancelAndJoin()
+			}
+		}
+
+	@Test
+	fun startupFailureRetriesWhileShowingLoading() =
+		runTest {
+			val repository = FakeProxies().apply { fail = true }
+			val panel = panel(repository)
+			val observing = backgroundScope.launch { panel.observe() }
+			runCurrent()
+			assertEquals(1, repository.loads)
+			assertTrue(panel.uiState.value.isLoading)
+			assertFalse(panel.uiState.value.hasLoaded)
+			repository.fail = false
+			advanceTimeBy(1000)
+			runCurrent()
+			assertEquals(2, repository.loads)
+			assertTrue(
+				panel.uiState.value.proxies
+					.isNotEmpty(),
+			)
+			assertFalse(panel.uiState.value.isLoading)
+			observing.cancelAndJoin()
+		}
+
+	@Test
+	fun hidingDuringStartupCancelsRetryAndReturningStillStartsInLoadingState() =
+		runTest {
+			val repository = FakeProxies().apply { fail = true }
+			val panel = panel(repository)
+			val first = backgroundScope.launch { panel.observe() }
+			runCurrent()
+			first.cancelAndJoin()
+			advanceTimeBy(1000)
+			runCurrent()
+			assertEquals(1, repository.loads)
+			assertTrue(panel.uiState.value.isLoading)
+			repository.fail = false
+			val returned = backgroundScope.launch { panel.observe() }
+			runCurrent()
+			assertEquals(2, repository.loads)
+			assertFalse(panel.uiState.value.isLoading)
+			returned.cancelAndJoin()
+		}
+
+	@Test
+	fun stoppingVpnWhilePanelIsHiddenInvalidatesCacheWithoutFetching() =
+		runTest {
+			val running = MutableStateFlow(true)
+			val repository = FakeProxies()
+			val panel = panel(repository, running)
+			val first = backgroundScope.launch { panel.observe() }
+			runCurrent()
+			assertTrue(
+				panel.uiState.value.proxies
+					.isNotEmpty(),
+			)
+			first.cancelAndJoin()
+			running.value = false
+			runCurrent()
+			assertEquals(PanelUiState(), panel.uiState.value)
+			running.value = true
+			runCurrent()
+			assertTrue(
+				panel.uiState.value.proxies
+					.isEmpty(),
+			)
+			assertTrue(panel.uiState.value.isLoading)
+			assertEquals(1, repository.loads)
+			val returned = backgroundScope.launch { panel.observe() }
+			runCurrent()
+			assertEquals(2, repository.loads)
+			assertFalse(panel.uiState.value.isLoading)
+			returned.cancelAndJoin()
+		}
+
+	@Test
+	fun hidingPanelRestoresPreviousDelayAfterCancellingTest() =
+		runTest {
+			val repository =
+				object : FakeProxies() {
+					override suspend fun getProxyDelay(name: String): Int = awaitCancellation()
+				}
+			val panel = panel(repository)
+			val observing = backgroundScope.launch { panel.observe() }
+			runCurrent()
+			val cached = panel.uiState.value
+			panel.onAction(PanelAction.TestGroupDelay("group"))
+			runCurrent()
+			assertEquals(ProxyDelay.Testing, panel.uiState.value.delays["leaf"])
+			observing.cancelAndJoin()
+			assertEquals(cached, panel.uiState.value)
+		}
+
+	@Test
+	fun emptyResultAndFailedStartupFinishLoading() =
+		runTest {
+			val empty =
+				panel(
+					object : FakeProxies() {
+						override suspend fun getProxies(): List<ProxyInfo> = emptyList()
+					},
+				)
+			val observingEmpty = backgroundScope.launch { empty.observe() }
+			runCurrent()
+			assertTrue(empty.uiState.value.hasLoaded)
+			assertTrue(
+				empty.uiState.value.proxies
+					.isEmpty(),
+			)
+			assertFalse(empty.uiState.value.isLoading)
+			observingEmpty.cancelAndJoin()
+
+			val repository = FakeProxies().apply { fail = true }
+			val failed = panel(repository)
+			val observingFailed = backgroundScope.launch { failed.observe() }
+			runCurrent()
+			advanceTimeBy(1000)
+			runCurrent()
+			assertEquals(2, repository.loads)
+			assertFalse(failed.uiState.value.isLoading)
+			assertEquals(R.string.home_api_error, failed.effects.first().resource)
+			observingFailed.cancelAndJoin()
+		}
+
 	@Test
 	fun connectionPageDiscardsLateResponseAfterItIsHidden() =
 		runBlocking {
@@ -93,7 +298,7 @@ class PageStateTest {
 							super.selectProxy(groupName, proxyName)
 						}
 					}
-				val panel = PanelViewModel(repository, MutableStateFlow(true))
+				val panel = panel(repository)
 				val observing = launch { panel.observe() }
 				try {
 					panel.uiState.first { it.proxies.isNotEmpty() }
@@ -166,6 +371,7 @@ class PageStateTest {
 			withTimeout(5000) {
 				val running = MutableStateFlow(true)
 				val requested = Channel<String>(Channel.UNLIMITED)
+				val cancellation = CompletableDeferred<Unit>()
 				var cancelled = false
 				val repository =
 					object : FakeProxies() {
@@ -175,10 +381,11 @@ class PageStateTest {
 								awaitCancellation()
 							} finally {
 								cancelled = true
+								cancellation.complete(Unit)
 							}
 						}
 					}
-				val panel = PanelViewModel(repository, running)
+				val panel = panel(repository, running)
 				val observing = launch { panel.observe() }
 				try {
 					panel.uiState.first { it.proxies.isNotEmpty() }
@@ -189,6 +396,7 @@ class PageStateTest {
 					assertTrue(requested.tryReceive().isFailure)
 					assertEquals(ProxyDelay.Testing, panel.uiState.value.delays["leaf"])
 					running.value = false
+					cancellation.await()
 					panel.uiState.first { it == PanelUiState() }
 					assertTrue(cancelled)
 				} finally {
@@ -202,9 +410,15 @@ class PageStateTest {
 		runBlocking {
 			withTimeout(5000) {
 				val selected = CompletableDeferred<Unit>()
+				val refreshed = CompletableDeferred<Unit>()
 				var cancelled = false
 				val repository =
 					object : FakeProxies() {
+						override suspend fun getProxies(): List<ProxyInfo> =
+							super.getProxies().also {
+								if (loads == 2) refreshed.complete(Unit)
+							}
+
 						override suspend fun selectProxy(
 							groupName: String,
 							proxyName: String,
@@ -217,18 +431,18 @@ class PageStateTest {
 							}
 						}
 					}
-				val panel = PanelViewModel(repository, MutableStateFlow(true))
+				val panel = panel(repository)
 				val first = launch { panel.observe() }
-				panel.uiState.first { it.proxies.isNotEmpty() }
+				val cached = panel.uiState.first { it.proxies.isNotEmpty() }
 				panel.onAction(PanelAction.SelectProxy("group", "leaf"))
 				selected.await()
 				first.cancelAndJoin()
 				assertTrue(cancelled)
-				assertEquals(PanelUiState(), panel.uiState.value)
+				assertEquals(cached, panel.uiState.value)
 				panel.onAction(PanelAction.Refresh)
 				val returned = launch { panel.observe() }
 				try {
-					panel.uiState.first { it.proxies.isNotEmpty() }
+					refreshed.await()
 					assertEquals(2, repository.loads)
 				} finally {
 					returned.cancelAndJoin()
@@ -241,7 +455,7 @@ class PageStateTest {
 		runBlocking {
 			withTimeout(5000) {
 				val repository = FakeProxies()
-				val panel = PanelViewModel(repository, MutableStateFlow(true))
+				val panel = panel(repository)
 				val observing = launch { panel.observe() }
 				try {
 					val initial = panel.uiState.first { it.proxies.isNotEmpty() }

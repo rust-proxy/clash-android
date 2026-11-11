@@ -9,7 +9,7 @@ plugins {
 	alias(libs.plugins.ktlint)
 }
 
-val baseVersionName = "0.5.0"
+val baseVersionName = "0.5.1"
 val Project.verName: String get() = "${baseVersionName}$versionNameSuffix.${exec("git rev-parse --short HEAD")}"
 val Project.verCode: Int get() = exec("git rev-list --count HEAD").toInt()
 val Project.isDevVersion: Boolean get() = exec("git tag -l v$baseVersionName").isEmpty()
@@ -176,6 +176,7 @@ dependencies {
 	ksp(libs.compose.destinations.ksp)
 
 	testImplementation(libs.junit)
+	testImplementation(libs.kotlinx.coroutines.test)
 	androidTestImplementation(libs.androidx.junit)
 	androidTestImplementation(libs.androidx.espresso.core)
 	androidTestImplementation(platform(libs.androidx.compose.bom))

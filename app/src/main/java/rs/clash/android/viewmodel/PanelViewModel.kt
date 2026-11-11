@@ -1,7 +1,9 @@
 package rs.clash.android.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
@@ -39,7 +41,10 @@ data class PanelUiState(
 	val proxies: List<ProxyInfo> = emptyList(),
 	val delays: Map<String, ProxyDelay> = emptyMap(),
 	val isRefreshing: Boolean = false,
+	val isVpnRunning: Boolean = false,
+	val hasLoaded: Boolean = false,
 ) {
+	val isLoading: Boolean get() = isRefreshing || (isVpnRunning && !hasLoaded)
 	val groups: List<ProxyInfo> get() = proxies.filter { it.all.isNotEmpty() }
 	val proxyTypes: Map<String, String> get() = proxies.associate { it.name to it.proxyType }
 }
@@ -66,7 +71,7 @@ class PanelViewModel(
 	private val repository: ProxyRepository = AppData.core,
 	private val running: StateFlow<Boolean> = Global.isServiceRunning,
 ) : ViewModel() {
-	private val state = MutableStateFlow(PanelUiState())
+	private val state = MutableStateFlow(PanelUiState(isVpnRunning = running.value))
 	val uiState = state.asStateFlow()
 	private val actions = MutableSharedFlow<PanelAction>(extraBufferCapacity = 64)
 	private val messages = Channel<PanelMessage>(Channel.BUFFERED)
@@ -74,28 +79,38 @@ class PanelViewModel(
 	private val refreshMutex = Mutex()
 	private val testing = mutableSetOf<String>()
 
+	init {
+		// Invalidate cached data across VPN sessions, even while this tab is hidden.
+		// This observer does not perform controller requests.
+		viewModelScope.launch {
+			running.collect { enabled ->
+				updateRunningState(enabled)
+			}
+		}
+	}
+
+	private fun updateRunningState(enabled: Boolean) {
+		state.update { current ->
+			if (current.isVpnRunning == enabled) current else PanelUiState(isVpnRunning = enabled)
+		}
+	}
+
 	fun onAction(action: PanelAction) {
 		actions.tryEmit(action)
 	}
 
 	/** Hidden/stopped pages have no action subscriber and cancel all outstanding work. */
 	suspend fun observe() {
-		try {
-			running.collectLatest { enabled ->
-				state.value = PanelUiState()
-				if (enabled) {
-					coroutineScope {
-						launch {
-							actions.collect { action -> launch { handleAction(action) } }
-						}
-						// TunService announces startup before the controller socket is ready.
-						delay(1000)
-						refreshProxies()
+		running.collectLatest { enabled ->
+			updateRunningState(enabled)
+			if (enabled) {
+				coroutineScope {
+					launch(start = CoroutineStart.UNDISPATCHED) {
+						actions.collect { action -> launch { handleAction(action) } }
 					}
+					refreshProxies(retryOnFailure = !state.value.hasLoaded)
 				}
 			}
-		} finally {
-			state.value = PanelUiState()
 		}
 	}
 
@@ -130,15 +145,26 @@ class PanelViewModel(
 		}
 	}
 
-	private suspend fun refreshProxies() {
-		refreshMutex.withLock { loadProxies() }
+	private suspend fun refreshProxies(retryOnFailure: Boolean = false) {
+		refreshMutex.withLock { loadProxies(retryOnFailure) }
 	}
 
-	private suspend fun loadProxies() {
+	private suspend fun loadProxies(retryOnFailure: Boolean = false) {
 		if (!running.value) return
 		state.update { it.copy(isRefreshing = true) }
 		try {
-			val proxies = repository.getProxies()
+			val proxies =
+				try {
+					repository.getProxies()
+				} catch (e: CancellationException) {
+					throw e
+				} catch (e: Exception) {
+					if (!retryOnFailure) throw e
+					// The service can announce startup before its controller socket is ready.
+					// A ready controller never pays this delay when returning to the tab.
+					delay(1000)
+					repository.getProxies()
+				}
 			currentCoroutineContext().ensureActive()
 			if (!running.value) return
 			state.update { current ->
@@ -150,11 +176,13 @@ class PanelViewModel(
 							val value = if (previous == ProxyDelay.Testing) previous else measured ?: previous
 							value?.let { proxy.name to it }
 						}.toMap()
-				current.copy(proxies = proxies, delays = delays)
+				current.copy(proxies = proxies, delays = delays, hasLoaded = true)
 			}
 		} catch (e: CancellationException) {
 			throw e
 		} catch (e: Exception) {
+			currentCoroutineContext().ensureActive()
+			if (running.value) state.update { it.copy(hasLoaded = true) }
 			reportError(R.string.home_api_error, e)
 		} finally {
 			state.update { it.copy(isRefreshing = false) }
@@ -163,6 +191,7 @@ class PanelViewModel(
 
 	private suspend fun testDelay(name: String) {
 		if (!testing.add(name)) return
+		val previous = state.value.delays[name]
 		try {
 			state.update { it.copy(delays = it.delays + (name to ProxyDelay.Testing)) }
 			val delay = repository.getProxyDelay(name)
@@ -175,6 +204,14 @@ class PanelViewModel(
 			if (running.value) state.update { it.copy(delays = it.delays + (name to ProxyDelay.Timeout)) }
 		} finally {
 			testing.remove(name)
+			state.update { current ->
+				if (current.delays[name] == ProxyDelay.Testing) {
+					val delays = if (previous == null) current.delays - name else current.delays + (name to previous)
+					current.copy(delays = delays)
+				} else {
+					current
+				}
+			}
 		}
 	}
 
