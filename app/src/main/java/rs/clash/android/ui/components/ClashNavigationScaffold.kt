@@ -7,11 +7,11 @@ import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
+import androidx.compose.material3.adaptive.WindowAdaptiveInfo
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -21,12 +21,13 @@ import com.ramcosta.composedestinations.generated.destinations.HomeScreenDestina
 import com.ramcosta.composedestinations.generated.destinations.PanelScreenDestination
 import com.ramcosta.composedestinations.generated.destinations.ProfileScreenDestination
 import com.ramcosta.composedestinations.generated.destinations.SettingsScreenDestination
+import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.ramcosta.composedestinations.spec.DirectionDestinationSpec
 import com.ramcosta.composedestinations.utils.isRouteOnBackStackAsState
 import com.ramcosta.composedestinations.utils.rememberDestinationsNavigator
 import rs.clash.android.R
 
-enum class BottomBarItem(
+internal enum class NavigationItem(
 	val direction: DirectionDestinationSpec,
 	val icon: ImageVector,
 	@StringRes val label: Int,
@@ -38,47 +39,43 @@ enum class BottomBarItem(
 }
 
 @Composable
-fun BottomBar(
+internal fun ClashNavigationScaffold(
 	navController: NavHostController,
+	adaptiveInfo: WindowAdaptiveInfo,
 	modifier: Modifier = Modifier,
+	content: @Composable () -> Unit,
 ) {
 	val navigator = navController.rememberDestinationsNavigator()
-	NavigationBar {
-		BottomBarItem.entries.forEach { destination ->
-			val isCurrentDestOnBackStack by navController.isRouteOnBackStackAsState(destination.direction)
-			NavigationBarItem(
-				selected = isCurrentDestOnBackStack,
-				onClick = {
-					if (isCurrentDestOnBackStack) {
-						// When we click again on a bottom bar item and it was already selected
-						// we want to pop the back stack until the initial destination of this bottom bar item
-						navigator.popBackStack(destination.direction, false)
-						return@NavigationBarItem
-					}
+	val selectedItems = NavigationItem.entries.filter { navController.isRouteOnBackStackAsState(it.direction).value }
+	NavigationSuiteScaffold(
+		modifier = modifier,
+		layoutType = NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(adaptiveInfo),
+		navigationSuiteItems = {
+			NavigationItem.entries.forEach { destination ->
+				val selected = destination in selectedItems
+				item(
+					selected = selected,
+					onClick = { navigator.select(destination, selected) },
+					icon = { Icon(destination.icon, contentDescription = null) },
+					label = { Text(stringResource(destination.label)) },
+				)
+			}
+		},
+		content = content,
+	)
+}
 
-					navigator.navigate(destination.direction) {
-						// Pop up to the root of the graph to
-						// avoid building up a large stack of destinations
-						// on the back stack as users select items
-						popUpTo(NavGraphs.root) {
-							saveState = true
-						}
-
-						// Avoid multiple copies of the same destination when
-						// re-selecting the same item
-						launchSingleTop = true
-						// Restore state when re-selecting a previously selected item
-						restoreState = true
-					}
-				},
-				icon = {
-					Icon(
-						destination.icon,
-						contentDescription = stringResource(destination.label),
-					)
-				},
-				label = { Text(stringResource(destination.label)) },
-			)
+private fun DestinationsNavigator.select(
+	item: NavigationItem,
+	selected: Boolean,
+) {
+	if (selected) {
+		popBackStack(item.direction, false)
+	} else {
+		navigate(item.direction) {
+			popUpTo(NavGraphs.root) { saveState = true }
+			launchSingleTop = true
+			restoreState = true
 		}
 	}
 }

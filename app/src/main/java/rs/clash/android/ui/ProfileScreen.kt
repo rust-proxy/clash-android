@@ -17,12 +17,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -30,7 +32,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -511,8 +512,8 @@ fun ProfileScreen(
 				Modifier
 					.fillMaxSize()
 					.padding(padding)
-					.padding(16.dp)
-					.verticalScroll(rememberScrollState()),
+					.verticalScroll(rememberScrollState())
+					.padding(horizontal = 16.dp, vertical = 8.dp),
 			verticalArrangement = Arrangement.spacedBy(16.dp),
 		) {
 			// Current Active Profile Card
@@ -524,9 +525,13 @@ fun ProfileScreen(
 					modifier = Modifier.fillMaxWidth(),
 				)
 			} else {
-				OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+				Card(
+					modifier = Modifier.fillMaxWidth(),
+					shape = MaterialTheme.shapes.extraLarge,
+					colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+				) {
 					Column(
-						modifier = Modifier.padding(16.dp),
+						modifier = Modifier.fillMaxWidth().padding(24.dp),
 						horizontalAlignment = Alignment.CenterHorizontally,
 					) {
 						Icon(
@@ -545,13 +550,40 @@ fun ProfileScreen(
 				}
 			}
 
-			// Profiles List
-			if (vm.profiles.isNotEmpty()) {
-				Text(
-					text = stringResource(R.string.profile_all_profiles, vm.profiles.size),
-					style = MaterialTheme.typography.titleMedium,
-					fontWeight = FontWeight.Bold,
-				)
+			// Action Buttons
+			Row(
+				modifier = Modifier.fillMaxWidth(),
+				horizontalArrangement = Arrangement.spacedBy(8.dp),
+			) {
+				FilledTonalButton(
+					onClick = {
+						launcher.launch(arrayOf("*/*"))
+					},
+					modifier = Modifier.weight(1f),
+				) {
+					Icon(
+						Icons.Default.FolderOpen,
+						contentDescription = null,
+						modifier = Modifier.size(20.dp),
+					)
+					Spacer(modifier = Modifier.width(8.dp))
+					Text(stringResource(R.string.profile_local_config))
+				}
+
+				FilledTonalButton(
+					onClick = {
+						showRemoteDialog.value = true
+					},
+					modifier = Modifier.weight(1f),
+				) {
+					Icon(
+						Icons.Default.CloudDownload,
+						contentDescription = null,
+						modifier = Modifier.size(20.dp),
+					)
+					Spacer(modifier = Modifier.width(8.dp))
+					Text(stringResource(R.string.profile_remote_config))
+				}
 			}
 
 			if (vm.verificationResult != null) {
@@ -562,7 +594,14 @@ fun ProfileScreen(
 				)
 			}
 
-			Spacer(modifier = Modifier.height(8.dp))
+			// Profiles List
+			if (vm.profiles.isNotEmpty()) {
+				Text(
+					text = stringResource(R.string.profile_all_profiles, vm.profiles.size),
+					style = MaterialTheme.typography.titleMedium,
+					fontWeight = FontWeight.Bold,
+				)
+			}
 
 			// Display all profiles
 			// Keyed by profile id: without a stable key each card's remembered state
@@ -589,44 +628,6 @@ fun ProfileScreen(
 							},
 						modifier = Modifier.fillMaxWidth(),
 					)
-				}
-			}
-
-			Spacer(modifier = Modifier.height(8.dp))
-
-			// Action Buttons
-			Row(
-				modifier = Modifier.fillMaxWidth(),
-				horizontalArrangement = Arrangement.spacedBy(8.dp),
-			) {
-				FilledTonalButton(
-					onClick = {
-						launcher.launch(arrayOf("*/*"))
-					},
-					modifier = Modifier.weight(1f),
-				) {
-					Icon(
-						Icons.Default.FolderOpen,
-						contentDescription = null,
-						modifier = Modifier.size(20.dp),
-					)
-					Spacer(modifier = Modifier.width(8.dp))
-					Text(stringResource(R.string.profile_local_config))
-				}
-				
-				FilledTonalButton(
-					onClick = {
-						showRemoteDialog.value = true
-					},
-					modifier = Modifier.weight(1f),
-				) {
-					Icon(
-						Icons.Default.Refresh,
-						contentDescription = null,
-						modifier = Modifier.size(20.dp),
-					)
-					Spacer(modifier = Modifier.width(8.dp))
-					Text(stringResource(R.string.profile_remote_config))
 				}
 			}
 		}

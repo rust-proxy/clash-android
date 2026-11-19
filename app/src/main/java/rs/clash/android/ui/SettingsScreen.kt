@@ -7,19 +7,21 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.DisplaySettings
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Info
@@ -37,6 +39,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -45,6 +48,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +56,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -61,11 +68,16 @@ import com.ramcosta.composedestinations.generated.destinations.AppSelectorScreen
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import rs.clash.android.MainActivity
 import rs.clash.android.R
+import rs.clash.android.model.MAX_UI_SCALE
+import rs.clash.android.model.MIN_UI_SCALE
+import rs.clash.android.model.UI_SCALE_STEP
+import rs.clash.android.model.UiScale
 import rs.clash.android.ui.components.TextInfoDialog
 import rs.clash.android.util.PermissionHelper
 import rs.clash.android.viewmodel.DarkModePreference
 import rs.clash.android.viewmodel.LanguagePreference
 import rs.clash.android.viewmodel.SettingsViewModel
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Destination<RootGraph>
@@ -75,10 +87,12 @@ fun SettingsScreen(
 	modifier: Modifier = Modifier,
 	viewModel: SettingsViewModel = viewModel(),
 ) {
+	var showScaleDialog by rememberSaveable { mutableStateOf(false) }
 	var showDarkModeDialog by remember { mutableStateOf(false) }
 	var showLanguageDialog by remember { mutableStateOf(false) }
 	val context = LocalContext.current
 	val activity = context as? MainActivity
+	val scale = UiScale(activity?.recommendedScale ?: 100, viewModel.manualUiScale)
 	var hasNotificationPermission by remember {
 		mutableStateOf(PermissionHelper.hasNotificationPermission(context))
 	}
@@ -101,6 +115,7 @@ fun SettingsScreen(
 	}
 
 	Scaffold(
+		modifier = modifier,
 		topBar = {
 			TopAppBar(
 				title = {
@@ -122,12 +137,10 @@ fun SettingsScreen(
 			modifier =
 				Modifier
 					.padding(padding)
-					.padding(horizontal = 16.dp)
 					.fillMaxSize(),
-			verticalArrangement = Arrangement.spacedBy(12.dp),
+			contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+			verticalArrangement = Arrangement.spacedBy(8.dp),
 		) {
-			item { Spacer(modifier = Modifier.height(4.dp)) }
-
 			// Appearance Section
 			item {
 				SectionHeader(text = stringResource(R.string.settings_appearance))
@@ -142,6 +155,18 @@ fun SettingsScreen(
 						onClick = {
 							showDarkModeDialog = true
 						},
+					)
+					HorizontalDivider(modifier = Modifier.padding(start = 56.dp))
+					SettingsItem(
+						icon = Icons.Default.DisplaySettings,
+						title = stringResource(R.string.settings_ui_scale),
+						subtitle =
+							if (scale.manual == null) {
+								stringResource(R.string.ui_scale_auto, scale.recommended)
+							} else {
+								stringResource(R.string.ui_scale_percent, scale.percent)
+							},
+						onClick = { showScaleDialog = true },
 					)
 					HorizontalDivider(modifier = Modifier.padding(start = 56.dp))
 					SettingsItem(
@@ -240,8 +265,18 @@ fun SettingsScreen(
 					)
 				}
 			}
+		}
 
-			item { Spacer(modifier = Modifier.height(16.dp)) }
+		if (showScaleDialog) {
+			UiScaleDialog(
+				scale = scale,
+				onDismiss = { showScaleDialog = false },
+				onConfirm = {
+					viewModel.updateUiScale(it)
+					showScaleDialog = false
+					if ((it ?: scale.recommended) != scale.percent) activity?.recreate()
+				},
+			)
 		}
 
 		// Dark Mode Dialog
@@ -283,10 +318,10 @@ private fun SectionHeader(
 ) {
 	Text(
 		text = text,
-		style = MaterialTheme.typography.labelLarge,
+		style = MaterialTheme.typography.titleMedium,
 		color = MaterialTheme.colorScheme.primary,
 		fontWeight = FontWeight.SemiBold,
-		modifier = modifier.padding(vertical = 4.dp),
+		modifier = modifier.padding(start = 4.dp, top = 8.dp, bottom = 2.dp),
 	)
 }
 
@@ -297,7 +332,8 @@ private fun SettingsCard(
 ) {
 	Card(
 		modifier = modifier.fillMaxWidth(),
-		elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+		shape = MaterialTheme.shapes.large,
+		colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
 	) {
 		content()
 	}
@@ -328,7 +364,7 @@ private fun SettingsItem(
 		) {
 			Icon(
 				imageVector = icon,
-				contentDescription = title,
+				contentDescription = null,
 				tint = MaterialTheme.colorScheme.primary,
 			)
 			Column {
@@ -378,7 +414,7 @@ private fun SettingsSwitchItem(
 		) {
 			Icon(
 				imageVector = icon,
-				contentDescription = title,
+				contentDescription = null,
 				tint = MaterialTheme.colorScheme.primary,
 			)
 			Column {
@@ -402,6 +438,63 @@ private fun SettingsSwitchItem(
 }
 
 @Composable
+private fun UiScaleDialog(
+	scale: UiScale,
+	onDismiss: () -> Unit,
+	onConfirm: (Int?) -> Unit,
+) {
+	var automatic by rememberSaveable { mutableStateOf(scale.manual == null) }
+	var percent by rememberSaveable { mutableStateOf(scale.percent) }
+	val title = stringResource(R.string.settings_ui_scale)
+	val percentage = stringResource(R.string.ui_scale_percent, percent)
+	AlertDialog(
+		onDismissRequest = onDismiss,
+		title = { Text(title) },
+		text = {
+			Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+				Text(
+					text = stringResource(R.string.ui_scale_recommendation),
+					style = MaterialTheme.typography.bodyMedium,
+					modifier = Modifier.padding(bottom = 8.dp),
+				)
+				Column(modifier = Modifier.selectableGroup()) {
+					PreferenceOption(
+						text = stringResource(R.string.ui_scale_auto, scale.recommended),
+						selected = automatic,
+						onClick = { automatic = true },
+					)
+					PreferenceOption(
+						text = stringResource(R.string.ui_scale_manual, percent),
+						selected = !automatic,
+						onClick = { automatic = false },
+					)
+				}
+				Slider(
+					value = percent.toFloat(),
+					onValueChange = { percent = (it / UI_SCALE_STEP).roundToInt() * UI_SCALE_STEP },
+					modifier =
+						Modifier.semantics {
+							contentDescription = title
+							stateDescription = percentage
+						},
+					enabled = !automatic,
+					valueRange = MIN_UI_SCALE.toFloat()..MAX_UI_SCALE.toFloat(),
+					steps = (MAX_UI_SCALE - MIN_UI_SCALE) / UI_SCALE_STEP - 1,
+				)
+			}
+		},
+		confirmButton = {
+			TextButton(onClick = { onConfirm(if (automatic) null else percent) }) {
+				Text(stringResource(R.string.confirm))
+			}
+		},
+		dismissButton = {
+			TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+		},
+	)
+}
+
+@Composable
 private fun DarkModeDialog(
 	currentPreference: DarkModePreference,
 	onDismiss: () -> Unit,
@@ -414,17 +507,17 @@ private fun DarkModeDialog(
 		title = { Text(stringResource(R.string.settings_dark_mode)) },
 		text = {
 			Column(modifier = Modifier.selectableGroup()) {
-				DarkModeOption(
+				PreferenceOption(
 					text = stringResource(R.string.dark_mode_system),
 					selected = selectedPreference == DarkModePreference.SYSTEM,
 					onClick = { selectedPreference = DarkModePreference.SYSTEM },
 				)
-				DarkModeOption(
+				PreferenceOption(
 					text = stringResource(R.string.dark_mode_light),
 					selected = selectedPreference == DarkModePreference.LIGHT,
 					onClick = { selectedPreference = DarkModePreference.LIGHT },
 				)
-				DarkModeOption(
+				PreferenceOption(
 					text = stringResource(R.string.dark_mode_dark),
 					selected = selectedPreference == DarkModePreference.DARK,
 					onClick = { selectedPreference = DarkModePreference.DARK },
@@ -445,7 +538,7 @@ private fun DarkModeDialog(
 }
 
 @Composable
-private fun DarkModeOption(
+private fun PreferenceOption(
 	text: String,
 	selected: Boolean,
 	onClick: () -> Unit,

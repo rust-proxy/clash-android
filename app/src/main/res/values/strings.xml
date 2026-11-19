@@ -25,6 +25,8 @@
     <string name="no_proxy_groups">未找到代理组。VPN 是否正在运行？</string>
     <string name="retry">重试</string>
     <string name="refreshing">正在刷新...</string>
+    <string name="traffic_summary">网络流量</string>
+    <string name="runtime_details">运行详情</string>
     <string name="stat_memory">内存占用</string>
     <string name="stat_memory_limit">限制: %1$s</string>
     <string name="stat_connections">活跃连接</string>
@@ -54,6 +56,11 @@
     <string name="settings_title">设置</string>
     <string name="settings_appearance">外观</string>
     <string name="settings_dark_mode">深色模式</string>
+    <string name="settings_ui_scale">界面缩放</string>
+    <string name="ui_scale_recommendation">自动模式根据屏幕分辨率和物理尺寸推荐缩放比例。</string>
+    <string name="ui_scale_auto">自动（%1$d%%）</string>
+    <string name="ui_scale_manual">手动（%1$d%%）</string>
+    <string name="ui_scale_percent">%1$d%%</string>
     <string name="settings_language">语言</string>
     <string name="settings_general">常规</string>
     <string name="settings_foreground_service">前台保活</string>

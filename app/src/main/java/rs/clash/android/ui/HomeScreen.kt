@@ -5,15 +5,17 @@ import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
@@ -34,13 +36,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.window.core.layout.WindowSizeClass
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.annotation.RootGraph
 import com.ramcosta.composedestinations.generated.destinations.ConnectionsScreenDestination
@@ -49,8 +51,10 @@ import kotlinx.coroutines.launch
 import rs.clash.android.R
 import rs.clash.android.data.MemoryUsage
 import rs.clash.android.formatSize
-import rs.clash.android.ui.components.StatsCard
+import rs.clash.android.ui.components.RuntimeCard
 import rs.clash.android.ui.components.TextInfoDialog
+import rs.clash.android.ui.components.TrafficCard
+import rs.clash.android.ui.components.VpnStatusCard
 import rs.clash.android.ui.snackbar.SnackbarController.Companion.showMessage
 import rs.clash.android.viewmodel.HomeAction
 import rs.clash.android.viewmodel.HomeEffect
@@ -60,6 +64,7 @@ import rs.clash.android.viewmodel.HomeViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
+	windowSizeClass: WindowSizeClass,
 	navigator: DestinationsNavigator,
 	modifier: Modifier = Modifier,
 	viewModel: HomeViewModel = viewModel(),
@@ -133,7 +138,7 @@ fun HomeScreen(
 	}
 
 	Scaffold(
-		modifier = Modifier.fillMaxSize(),
+		modifier = modifier.fillMaxSize(),
 		topBar = {
 			TopAppBar(
 				title = { Text(stringResource(R.string.home_title)) },
@@ -161,6 +166,7 @@ fun HomeScreen(
 		val upload = uiState.overview.uploadTotal
 
 		OverviewTab(
+			windowSizeClass = windowSizeClass,
 			memory = memory,
 			connections = connections,
 			download = download,
@@ -179,6 +185,7 @@ fun HomeScreen(
 
 @Composable
 fun OverviewTab(
+	windowSizeClass: WindowSizeClass,
 	memory: MemoryUsage?,
 	connections: Int,
 	download: Long,
@@ -188,71 +195,73 @@ fun OverviewTab(
 	modifier: Modifier = Modifier,
 	onConnectionsClick: () -> Unit = {},
 ) {
-	LazyColumn(
-		modifier =
-			modifier
-				.padding(horizontal = 16.dp)
-				.fillMaxSize(),
+	val wide = windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
+	val trafficColumns = if (windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)) 2 else 1
+	Column(
+		modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
 		verticalArrangement = Arrangement.spacedBy(12.dp),
 	) {
-		item { Spacer(modifier = Modifier.height(16.dp)) }
-
-		item(key = "vpn") {
-			StatsCard(
-				title = stringResource(R.string.stat_vpn),
-				value = if (isVpnRunning) stringResource(R.string.stat_vpn_running) else stringResource(R.string.stat_vpn_stopped),
-				subtitle = if (isVpnRunning) stringResource(R.string.stat_vpn_hint_stop) else stringResource(R.string.stat_vpn_hint_start),
-				containerColor = if (isVpnRunning) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer,
-				onClick = onVpnToggle,
-			)
-		}
-
-		item(key = "memory") {
-			StatsCard(
-				title = stringResource(R.string.stat_memory),
-				value = memory?.let { formatSize(it.inuse) } ?: stringResource(R.string.not_available),
-				subtitle =
-					memory?.let { stringResource(R.string.stat_memory_limit, formatSize(it.oslimit)) }
-						?: stringResource(R.string.refreshing),
-			)
-		}
-
-		item(key = "connections") {
-			StatsCard(
-				title = stringResource(R.string.stat_connections),
-				value = connections.toString(),
-				subtitle =
-					if (connections >
-						0
-					) {
-						stringResource(R.string.stat_connections_ongoing)
-					} else {
-						stringResource(R.string.stat_connections_none)
-					},
-				onClick = onConnectionsClick,
-			)
-		}
-
-		item(key = "bandwidth") {
-			Row(
-				modifier = Modifier.fillMaxWidth(),
-				horizontalArrangement = Arrangement.spacedBy(12.dp),
-			) {
-				StatsCard(
-					title = stringResource(R.string.stat_download),
-					value = formatSize(download),
-					modifier = Modifier.weight(1f),
-				)
-				StatsCard(
-					title = stringResource(R.string.stat_upload),
-					value = formatSize(upload),
-					modifier = Modifier.weight(1f),
-				)
+		if (wide) {
+			Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+				VpnStatusCard(running = isVpnRunning, onClick = onVpnToggle, modifier = Modifier.weight(1f))
+				TrafficSummary(download, upload, columns = trafficColumns, modifier = Modifier.weight(1f))
 			}
+		} else {
+			VpnStatusCard(running = isVpnRunning, onClick = onVpnToggle)
+			TrafficSummary(download, upload, columns = trafficColumns)
 		}
-
-		item { Spacer(modifier = Modifier.height(16.dp)) }
+		OverviewHeading(stringResource(R.string.runtime_details))
+		RuntimeCard(
+			memory = memory,
+			connections = connections,
+			running = isVpnRunning,
+			wide = wide,
+			onConnectionsClick = onConnectionsClick,
+		)
 	}
+}
+
+@Composable
+private fun TrafficSummary(
+	download: Long,
+	upload: Long,
+	columns: Int,
+	modifier: Modifier = Modifier,
+) {
+	Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+		OverviewHeading(stringResource(R.string.traffic_summary))
+		FlowRow(
+			maxItemsInEachRow = columns,
+			horizontalArrangement = Arrangement.spacedBy(12.dp),
+			verticalArrangement = Arrangement.spacedBy(12.dp),
+		) {
+			TrafficCard(
+				title = stringResource(R.string.stat_download),
+				value = formatSize(download),
+				icon = Icons.Default.ArrowDownward,
+				accent = MaterialTheme.colorScheme.primary,
+				inlineValue = columns == 1,
+				modifier = Modifier.weight(1f),
+			)
+			TrafficCard(
+				title = stringResource(R.string.stat_upload),
+				value = formatSize(upload),
+				icon = Icons.Default.ArrowUpward,
+				accent = MaterialTheme.colorScheme.tertiary,
+				inlineValue = columns == 1,
+				modifier = Modifier.weight(1f),
+			)
+		}
+	}
+}
+
+@Composable
+private fun OverviewHeading(title: String) {
+	Text(
+		text = title,
+		modifier = Modifier.padding(start = 4.dp, top = 8.dp),
+		style = MaterialTheme.typography.titleMedium,
+	)
 }
 
 private fun restartApp(context: android.content.Context) {

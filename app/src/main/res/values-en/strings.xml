@@ -26,6 +26,8 @@
     <string name="no_proxy_groups">No proxy groups found. Is VPN running?</string>
     <string name="retry">Retry</string>
     <string name="refreshing">Refreshing...</string>
+    <string name="traffic_summary">Network traffic</string>
+    <string name="runtime_details">Runtime details</string>
     <string name="stat_memory">Memory Usage</string>
     <string name="stat_memory_limit">Limit: %1$s</string>
     <string name="stat_connections">Active Connections</string>
@@ -55,6 +57,11 @@
     <string name="settings_title">Settings</string>
     <string name="settings_appearance">Appearance</string>
     <string name="settings_dark_mode">Dark Mode</string>
+    <string name="settings_ui_scale">UI scale</string>
+    <string name="ui_scale_recommendation">Automatic scaling uses the screen resolution and physical size of your display.</string>
+    <string name="ui_scale_auto">Automatic (%1$d%%)</string>
+    <string name="ui_scale_manual">Manual (%1$d%%)</string>
+    <string name="ui_scale_percent">%1$d%%</string>
     <string name="settings_language">Language</string>
     <string name="settings_general">General</string>
     <string name="settings_foreground_service">Keep Alive</string>

@@ -9,6 +9,8 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import rs.clash.android.R
+import rs.clash.android.model.UI_SCALE_KEY
+import rs.clash.android.util.manualUiScale
 
 enum class DarkModePreference {
 	SYSTEM,
@@ -34,6 +36,9 @@ class SettingsViewModel(
 	private val prefs = application.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
 	var darkModePreference: DarkModePreference by mutableStateOf(loadDarkModePreference())
+		private set
+
+	internal var manualUiScale: Int? by mutableStateOf(prefs.manualUiScale())
 		private set
 
 	var languagePreference: LanguagePreference by mutableStateOf(loadLanguagePreference())
@@ -127,6 +132,13 @@ class SettingsViewModel(
 	fun updateDarkModePreference(preference: DarkModePreference) {
 		darkModePreference = preference
 		prefs.edit { putString("dark_mode", preference.name) }
+	}
+
+	internal fun updateUiScale(percent: Int?) {
+		manualUiScale = percent
+		prefs.edit {
+			if (percent == null) remove(UI_SCALE_KEY) else putInt(UI_SCALE_KEY, percent)
+		}
 	}
 
 	fun updateLanguagePreference(preference: LanguagePreference) {

@@ -13,7 +13,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.navigation.NavBackStackEntry
 import com.ramcosta.composedestinations.spec.DestinationStyle
-import rs.clash.android.ui.components.BottomBarItem
+import rs.clash.android.ui.components.NavigationItem
 
 object ScaleTransitions : DestinationStyle.Animated() {
 	override val enterTransition: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
@@ -74,7 +74,7 @@ object ScaleTransitions : DestinationStyle.Animated() {
 }
 
 object SlideHorizontalTransitions : DestinationStyle.Animated() {
-	private fun getDestinationIndex(route: String?): Int = BottomBarItem.entries.indexOfFirst { it.direction.route == route }
+	private fun getDestinationIndex(route: String?): Int = NavigationItem.entries.indexOfFirst { it.direction.route == route }
 
 	override val enterTransition: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
 		val targetIndex = getDestinationIndex(targetState.destination.route)

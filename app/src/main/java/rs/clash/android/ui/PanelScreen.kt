@@ -13,6 +13,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -28,6 +29,7 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -45,22 +47,23 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.window.core.layout.WindowSizeClass
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.annotation.RootGraph
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
@@ -76,12 +79,12 @@ import rs.clash.android.viewmodel.ProxyDelay
 // Constants
 private const val DELAY_EXCELLENT_MS = 300
 private const val DELAY_GOOD_MS = 600
-private const val PROXY_COLUMNS = 2
 
 @Destination<RootGraph>
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PanelScreen(
+	windowSizeClass: WindowSizeClass,
 	navigator: DestinationsNavigator,
 	modifier: Modifier = Modifier,
 	viewModel: PanelViewModel = viewModel(),
@@ -99,6 +102,7 @@ fun PanelScreen(
 	}
 
 	Scaffold(
+		modifier = modifier,
 		topBar = {
 			TopAppBar(
 				title = { Text(stringResource(R.string.panel_screen)) },
@@ -116,6 +120,13 @@ fun PanelScreen(
 	) { padding ->
 		ProxyTab(
 			state = uiState,
+			columns =
+				when {
+					windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_LARGE_LOWER_BOUND) -> 4
+					windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND) -> 3
+					windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND) -> 2
+					else -> 1
+				},
 			onSelectProxy = { groupName, proxyName -> viewModel.onAction(PanelAction.SelectProxy(groupName, proxyName)) },
 			onTestGroupDelay = { group -> viewModel.onAction(PanelAction.TestGroupDelay(group)) },
 			modifier = Modifier.padding(padding).fillMaxSize(),
@@ -126,59 +137,65 @@ fun PanelScreen(
 @Composable
 private fun ProxyTab(
 	state: PanelUiState,
+	columns: Int,
 	onSelectProxy: (String, String) -> Unit,
 	onTestGroupDelay: (String) -> Unit,
 	modifier: Modifier = Modifier,
 ) {
-	val proxies = state.proxies
+	val groups = remember(state.proxies) { state.groups }
 	val isLoading = state.isLoading
 	val delays = state.delays
 	Box(modifier = modifier.fillMaxSize()) {
 		when {
-			proxies.isEmpty() && !isLoading -> {
+			groups.isEmpty() && !isLoading -> {
 				Box(
 					modifier = Modifier.fillMaxSize(),
 					contentAlignment = Alignment.Center,
 				) {
-					Text(
-						text = stringResource(R.string.no_proxy_groups),
-						style = MaterialTheme.typography.bodyLarge,
-						color = MaterialTheme.colorScheme.onSurfaceVariant,
-					)
+					Column(
+						horizontalAlignment = Alignment.CenterHorizontally,
+						verticalArrangement = Arrangement.spacedBy(16.dp),
+					) {
+						Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.secondaryContainer) {
+							Icon(Icons.Outlined.Hub, contentDescription = null, modifier = Modifier.padding(18.dp).size(32.dp))
+						}
+						Text(
+							text = stringResource(R.string.no_proxy_groups),
+							modifier = Modifier.padding(horizontal = 24.dp),
+							textAlign = TextAlign.Center,
+							style = MaterialTheme.typography.titleMedium,
+							color = MaterialTheme.colorScheme.onSurfaceVariant,
+						)
+					}
 				}
 			}
 			else -> {
-				val proxyTypesMap = remember(proxies) { state.proxyTypes }
-				val groups = remember(proxies) { state.groups }
+				val proxyTypesMap = remember(state.proxies) { state.proxyTypes }
 
 				if (groups.isNotEmpty()) {
 					LazyColumn(
 						modifier = Modifier.fillMaxSize(),
+						contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 24.dp),
 						verticalArrangement = Arrangement.spacedBy(12.dp),
 					) {
-						item { Spacer(modifier = Modifier.height(16.dp)) }
-
 						items(
 							items = groups,
 							key = { it.name },
 						) { it ->
-							Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-								ProxyGroupWidget(
-									name = it.name,
-									proxy = it,
-									delays = delays,
-									proxyTypes = proxyTypesMap,
-									onSelect = { selectedName ->
-										onSelectProxy(it.name, selectedName)
-									},
-									onTestDelay = {
-										onTestGroupDelay(it.name)
-									},
-								)
-							}
+							ProxyGroupWidget(
+								name = it.name,
+								columns = columns,
+								proxy = it,
+								delays = delays,
+								proxyTypes = proxyTypesMap,
+								onSelect = { selectedName ->
+									onSelectProxy(it.name, selectedName)
+								},
+								onTestDelay = {
+									onTestGroupDelay(it.name)
+								},
+							)
 						}
-
-						item { Spacer(modifier = Modifier.height(100.dp)) } // More bottom space
 					}
 				}
 			}
@@ -214,6 +231,7 @@ private fun ProxyTab(
 
 @Composable
 private fun ProxyGroupWidget(
+	columns: Int,
 	name: String,
 	proxy: ProxyInfo,
 	delays: Map<String, ProxyDelay>,
@@ -222,7 +240,7 @@ private fun ProxyGroupWidget(
 	modifier: Modifier = Modifier,
 	onTestDelay: () -> Unit = {},
 ) {
-	var expanded by remember { mutableStateOf(false) }
+	var expanded by rememberSaveable { mutableStateOf(false) }
 	val rotation by animateFloatAsState(
 		targetValue = if (expanded) 180f else 0f,
 		animationSpec =
@@ -235,7 +253,8 @@ private fun ProxyGroupWidget(
 
 	Card(
 		modifier = modifier.fillMaxWidth(),
-		elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+		shape = MaterialTheme.shapes.large,
+		colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
 	) {
 		Column(modifier = Modifier.padding(12.dp)) {
 			Row(
@@ -282,7 +301,7 @@ private fun ProxyGroupWidget(
 
 				IconButton(
 					onClick = onTestDelay,
-					modifier = Modifier.size(40.dp),
+					modifier = Modifier.size(48.dp),
 				) {
 					Icon(
 						imageVector = Icons.Default.Bolt,
@@ -314,13 +333,11 @@ private fun ProxyGroupWidget(
 							animationSpec = tween(durationMillis = 200),
 						),
 			) {
-				Column {
-					Spacer(modifier = Modifier.height(8.dp))
+				Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
 					HorizontalDivider()
-					Spacer(modifier = Modifier.height(4.dp))
 
-					proxy.all.chunked(PROXY_COLUMNS).forEach { rowItems ->
-						Row(modifier = Modifier.fillMaxWidth()) {
+					proxy.all.chunked(columns).forEach { rowItems ->
+						Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
 							rowItems.forEach { option ->
 								ProxyItem(
 									option = option,
@@ -331,7 +348,7 @@ private fun ProxyGroupWidget(
 									modifier = Modifier.weight(1f),
 								)
 							}
-							if (rowItems.size == 1) {
+							repeat(columns - rowItems.size) {
 								Spacer(modifier = Modifier.weight(1f))
 							}
 						}
@@ -352,20 +369,15 @@ private fun ProxyItem(
 	modifier: Modifier = Modifier,
 ) {
 	Surface(
-		modifier =
-			modifier
-				.clickable { onSelect() }
-				.padding(8.dp),
-		color =
-			if (isSelected) {
-				MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-			} else {
-				Color.Transparent
-			},
-		shape = MaterialTheme.shapes.small,
+		selected = isSelected,
+		onClick = onSelect,
+		modifier = modifier,
+		color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+		contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+		shape = MaterialTheme.shapes.medium,
 	) {
 		Column(
-			modifier = Modifier.padding(8.dp),
+			modifier = Modifier.padding(12.dp),
 		) {
 			Row(
 				modifier = Modifier.fillMaxWidth(),
@@ -376,12 +388,6 @@ private fun ProxyItem(
 					text = option,
 					style = MaterialTheme.typography.bodyMedium,
 					modifier = Modifier.weight(1f),
-					color =
-						if (isSelected) {
-							MaterialTheme.colorScheme.primary
-						} else {
-							MaterialTheme.colorScheme.onSurface
-						},
 					fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
 					maxLines = 1,
 					overflow = TextOverflow.Ellipsis,
@@ -390,7 +396,6 @@ private fun ProxyItem(
 					Icon(
 						Icons.Default.Check,
 						contentDescription = stringResource(R.string.selected),
-						tint = MaterialTheme.colorScheme.primary,
 						modifier = Modifier.size(16.dp),
 					)
 				}
@@ -407,8 +412,7 @@ private fun ProxyItem(
 					Text(
 						text = type.uppercase(),
 						style = MaterialTheme.typography.labelSmall,
-						fontSize = 9.sp,
-						color = MaterialTheme.colorScheme.outline,
+						color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
 						maxLines = 1,
 					)
 				}
@@ -426,9 +430,9 @@ private fun ProxyItem(
 							delay is ProxyDelay.Measured -> {
 								val ms = delay.millis
 								when {
-									ms < DELAY_EXCELLENT_MS -> Color(0xFF4CAF50) // Green
-									ms < DELAY_GOOD_MS -> Color(0xFFFFC107) // Amber
-									else -> Color(0xFFF44336) // Red
+									ms < DELAY_EXCELLENT_MS -> MaterialTheme.colorScheme.primary
+									ms < DELAY_GOOD_MS -> MaterialTheme.colorScheme.tertiary
+									else -> MaterialTheme.colorScheme.error
 								}
 							}
 							delay == ProxyDelay.Testing -> MaterialTheme.colorScheme.outline
@@ -438,9 +442,8 @@ private fun ProxyItem(
 					Text(
 						text = displayedDelay,
 						style = MaterialTheme.typography.labelSmall,
-						fontSize = 9.sp,
 						fontWeight = FontWeight.Medium,
-						color = delayColor,
+						color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else delayColor,
 					)
 				}
 			}

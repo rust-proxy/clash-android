@@ -170,6 +170,8 @@ dependencies {
 	implementation(libs.androidx.ui.tooling.preview)
 	implementation(libs.androidx.compose.material3)
 	implementation(libs.androidx.material3)
+	implementation(libs.androidx.material3.adaptive)
+	implementation(libs.androidx.material3.navigation.suite)
 	implementation(libs.androidx.material.icons.extended)
 	implementation(libs.compose.destinations.core)
 
