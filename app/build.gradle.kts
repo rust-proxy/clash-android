@@ -1,13 +1,25 @@
+import com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension
+import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.ValueSource
 import org.gradle.api.provider.ValueSourceParameters
 
 plugins {
 	alias(libs.plugins.android.application)
+	alias(libs.plugins.google.services)
+	alias(libs.plugins.firebase.crashlytics)
 	alias(libs.plugins.kotlin.compose)
 	alias(libs.plugins.ksp)
 	alias(libs.plugins.ktlint)
 }
+
+googleServices {
+	missingGoogleServicesStrategy = MissingGoogleServicesStrategy.IGNORE
+}
+
+// Keep unconfigured checkouts buildable and test data separate from production.
+val firebaseRelease = file("src/release/google-services.json").isFile
+val firebaseDebug = file("src/debug/google-services.json").isFile
 
 val baseVersionName = "0.5.4"
 val Project.verName: String get() = "${baseVersionName}$versionNameSuffix.${exec("git rev-parse --short HEAD")}"
@@ -80,6 +92,7 @@ configurations.configureEach {
 }
 
 android {
+	ndkVersion = providers.gradleProperty("clashNdkVersion").get()
 	buildToolsVersion = rootProject.extra["buildToolsVersion"] as String
 	val keystore = env("KEYSTORE_FILE")
 
@@ -119,6 +132,17 @@ android {
 
 	buildTypes {
 		release {
+			buildConfigField("boolean", "FIREBASE_ENABLED", firebaseRelease.toString())
+			configure<CrashlyticsExtension> {
+				mappingFileUploadEnabled = firebaseRelease && providers.gradleProperty("uploadFirebaseMapping").orNull == "true"
+				nativeSymbolUploadEnabled = firebaseRelease
+				unstrippedNativeLibsDir =
+					project(":core")
+						.layout.buildDirectory
+						.dir("rustJniLibs/android")
+						.get()
+						.asFile
+			}
 			isMinifyEnabled = true
 			isShrinkResources = true
 			if (keystore != null) {
@@ -126,6 +150,7 @@ android {
 			}
 		}
 		debug {
+			buildConfigField("boolean", "FIREBASE_ENABLED", firebaseDebug.toString())
 			isMinifyEnabled = false
 			if (keystore == null) {
 				applicationIdSuffix = ".dev"
@@ -137,6 +162,7 @@ android {
 		targetCompatibility = JavaVersion.VERSION_25
 	}
 	buildFeatures {
+		buildConfig = true
 		compose = true
 		resValues = true
 	}
@@ -154,6 +180,10 @@ kotlin {
 }
 
 dependencies {
+	implementation(platform(libs.firebase.bom))
+	implementation(libs.firebase.analytics)
+	implementation(libs.firebase.crashlytics.ndk)
+	implementation(libs.protobuf.lite)
 	implementation(project(":core"))
 	// Kotlin half of `rustls-platform-verifier`; the version is pinned to the
 	// `rustls-platform-verifier-android` crate by the resolution strategy above.

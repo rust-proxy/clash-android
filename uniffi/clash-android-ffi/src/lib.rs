@@ -99,6 +99,7 @@ pub extern "system" fn java_init(
     mut env: jni::EnvUnowned,
     _class: jni::objects::JClass,
     #[cfg_attr(not(target_os = "android"), allow(unused_variables))] context: jni::objects::JObject,
+    panic_file: jni::objects::JString,
 ) {
     use jni::{Outcome, errors::Result as JniResult};
 
@@ -144,8 +145,30 @@ pub extern "system" fn java_init(
         // logcat. color_eyre's default hook prints to stderr, which on
         // Android is /dev/null — without this the tombstone only shows
         // the abort message and raw `pc` offsets.
+        let panic_path = if panic_file.is_null() {
+            None
+        } else {
+            match env
+                .with_env(|env| panic_file.try_to_string(env))
+                .into_outcome()
+            {
+                Outcome::Ok(path) => Some(PathBuf::from(path)),
+                _ => None,
+            }
+        };
         let prev = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
+            if let (Some(path), Some(location)) = (&panic_path, info.location()) {
+                // Panic payloads and absolute paths may contain profile or subscription data.
+                let file = location.file().rsplit(['/', '\\']).next().unwrap_or("rust");
+                use std::io::Write;
+                if let Some(parent) = path.parent()
+                    && let Ok(mut temporary) = tempfile::NamedTempFile::new_in(parent)
+                    && write!(temporary, "{}:{}", file, location.line()).is_ok()
+                {
+                    let _ = temporary.persist(path);
+                }
+            }
             let bt = std::backtrace::Backtrace::force_capture();
             error!(target: "panic", "thread panicked: {info}\n{bt}");
             prev(info);

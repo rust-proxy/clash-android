@@ -23,6 +23,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import rs.clash.android.diagnostics.ProxyDiagnostics
 import rs.clash.android.util.NotificationHelper
 import uniffi.clash_android_ffi.ClashInstance
 import uniffi.clash_android_ffi.ProfileOverride
@@ -185,6 +186,7 @@ class TunService : VpnService() {
 			sendState()
 			scope.cancel()
 			clash?.shutdown()
+			ProxyDiagnostics.markStopped()
 		} finally {
 			// Some core tasks outlive shutdown. End only the dedicated proxy process so
 			// its descriptors and native runtime are gone before the next VPN session.

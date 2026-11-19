@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
+import rs.clash.android.diagnostics.ProxyDiagnostics
 
 /** A UI-process mirror of the started VPN service. Observing never starts or keeps it alive. */
 internal class ProxySession(
@@ -121,6 +122,7 @@ internal class ProxySession(
 
 		override fun onServiceDisconnected(name: ComponentName) {
 			if (connection !== this) return
+			ProxyDiagnostics.recover(context, afterDisconnect = true)
 			snapshot.value = VpnSessionState()
 			reconnect()
 		}

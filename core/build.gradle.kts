@@ -89,8 +89,7 @@ cargo {
 
 	targets = listOf("arm64", "arm", "x86", "x86_64")
 //	targets = listOf("arm64")
-    // Switch to "release-dbg" to ship a build whose Rust panics print
-    // symbolicated backtraces in logcat (defined in uniffi/Cargo.toml).
+    // Cargo keeps line tables here. AGP strips the APK copy; CI archives the originals.
     profile = "release"
 }
 

@@ -1,4 +1,8 @@
 [versions]
+# BoM 35 raises the Crashlytics NDK minimum to API 24. The app supports API 23.
+firebaseBom = "34.19.0"
+googleServices = "4.6.0"
+crashlyticsPlugin = "3.0.8"
 agp = "9.5.1"
 kotlin = "2.4.21"
 rust-android-gradle = "0.11.1"
@@ -20,6 +24,10 @@ material3 = "1.4.0"
 ktlint-compose = "0.6.8"
 
 [libraries]
+firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
+firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
+firebase-crashlytics-ndk = { module = "com.google.firebase:firebase-crashlytics-ndk" }
+protobuf-lite = { module = "com.google.protobuf:protobuf-javalite", version = "4.33.5" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "androidx-appcompat" }
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycleRuntimeKtx" }
@@ -59,6 +67,8 @@ rustls-platform-verifier = { group = "org.rustls", name = "rustls-platform-verif
 
 
 [plugins]
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
+firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "crashlyticsPlugin" }
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }

@@ -118,9 +118,29 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           ANDROID_SPLIT_ABI_ENABLE: true
           ANDROID_SPLIT_ABI_UNIVERSAL_APK: true
+          FIREBASE_RELEASE_JSON: ${{ secrets.FIREBASE_RELEASE_GOOGLE_SERVICES_JSON }}
         run: |
           rm -rf app/build/outputs/apk
-          ./gradlew --build-cache app:assembleRelease
+          : "${FIREBASE_RELEASE_JSON:?Set FIREBASE_RELEASE_GOOGLE_SERVICES_JSON to the production Android app configuration}"
+          mkdir -p app/src/release
+          printf '%s' "$FIREBASE_RELEASE_JSON" > app/src/release/google-services.json
+          ./gradlew --build-cache -PuploadFirebaseMapping=true app:assembleRelease
+
+          ./gradlew :app:generateCrashlyticsSymbolFileRelease
+          # Check the actual APK against the unstripped Cargo outputs before uploading symbols.
+          bash .github/verify-native-symbols.sh release
+          ./gradlew :app:uploadCrashlyticsSymbolFileRelease
+
+      - name: Archive matching native symbols and R8 mapping
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: crash-symbols-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            core/build/rustJniLibs/android/*/libclash_android_ffi.so
+            app/build/outputs/mapping/release/mapping.txt
+            build/native-symbols-release.txt
+          if-no-files-found: error
 
       - name: Organize APKs
         if: github.event_name != 'pull_request'

@@ -37,6 +37,7 @@ replay_pid*
 .cxx
 local.properties
 signing.properties
+google-services.json
 uniffi/.vscode/settings.json
 .claude/
 .claude/settings.local.json

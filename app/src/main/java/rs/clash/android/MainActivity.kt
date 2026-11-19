@@ -21,6 +21,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.graphics.luminance
 import androidx.core.content.ContextCompat
 import rs.clash.android.data.AppData
+import rs.clash.android.diagnostics.ProxyDiagnostics
 import rs.clash.android.theme.ClashAndroidTheme
 import rs.clash.android.util.manualUiScale
 import rs.clash.android.util.recommendedUiScale
@@ -94,6 +95,7 @@ class MainActivity : ComponentActivity() {
 
 	override fun onStart() {
 		super.onStart()
+		ProxyDiagnostics.recover(this)
 		AppData.vpn.attach()
 	}
 

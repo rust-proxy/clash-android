@@ -1,21 +1,37 @@
 package rs.clash.android
 
+import android.app.ActivityManager
 import android.content.Context
+import android.os.Build
+import android.os.Process
 import android.util.Log
+import rs.clash.android.diagnostics.ProxyDiagnostics
 import uniffi.clash_android_ffi.EyreException
 import uniffi.clash_android_ffi.formatEyreError
 import android.app.Application as AndroidApplication
 
 class Application : AndroidApplication() {
-	private external fun javaInit(context: Context)
+	private external fun javaInit(
+		context: Context,
+		panicFile: String?,
+	)
 
 	override fun onCreate() {
 		super.onCreate()
 		// Setup uncaught exception handler
 		setupUncaughtExceptionHandler()
 		Global.application = this
+		val process =
+			if (Build.VERSION.SDK_INT >= 28) {
+				AndroidApplication.getProcessName()
+			} else {
+				getSystemService(ActivityManager::class.java).runningAppProcesses?.find { it.pid == Process.myPid() }?.processName
+			}
+		val panicFile =
+			if (BuildConfig.FIREBASE_ENABLED && process == "$packageName:proxy") ProxyDiagnostics.begin(this) else null
+		if (process == packageName) ProxyDiagnostics.recover(this)
 		System.loadLibrary("clash_android_ffi")
-		javaInit(this)
+		javaInit(this, panicFile)
 	}
 }
 

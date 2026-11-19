@@ -19,7 +19,8 @@ opt-level = "z"
 lto = true
 codegen-units = 1
 panic = "unwind"
-strip = true
+strip = "none"
+debug = "line-tables-only"
 
 # Referenced by core/build.gradle.kts ("release-dbg"): a release build that keeps
 # line tables so Rust panics produce symbolicated backtraces in logcat.
