@@ -520,7 +520,7 @@ fun ProfileScreen(
 			if (vm.activeProfile != null) {
 				ActiveProfileCard(
 					profile = vm.activeProfile!!,
-					onVerify = { vm.verifyCurrentConfig(context) },
+					onVerify = vm::verifyCurrentConfig,
 					isVerifying = vm.isVerifying,
 					modifier = Modifier.fillMaxWidth(),
 				)
@@ -586,9 +586,9 @@ fun ProfileScreen(
 				}
 			}
 
-			if (vm.verificationResult != null) {
+			vm.verificationResult?.let { result ->
 				VerificationResultCard(
-					result = vm.verificationResult!!,
+					result = result,
 					onDismiss = { vm.clearVerificationResult() },
 					modifier = Modifier.fillMaxWidth(),
 				)

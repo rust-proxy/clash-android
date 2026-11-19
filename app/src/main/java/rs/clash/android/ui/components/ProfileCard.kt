@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import rs.clash.android.R
 import rs.clash.android.formatSize
 import rs.clash.android.model.Profile
+import rs.clash.android.viewmodel.VerificationResult
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -300,11 +301,11 @@ fun ProfileCard(
 
 @Composable
 fun VerificationResultCard(
-	result: String,
+	result: VerificationResult,
 	onDismiss: () -> Unit,
 	modifier: Modifier = Modifier,
 ) {
-	val isValid = result.contains("合法") || result.contains("valid")
+	val isValid = result.isValid
 	val scrollState = rememberScrollState()
 	
 	ElevatedCard(
@@ -354,7 +355,12 @@ fun VerificationResultCard(
 				)
 				Spacer(modifier = Modifier.height(4.dp))
 				Text(
-					text = result,
+					text =
+						if (result.detail == null) {
+							stringResource(R.string.profile_not_found)
+						} else {
+							stringResource(if (isValid) R.string.profile_verify_valid else R.string.profile_verify_failed, result.detail)
+						},
 					style = MaterialTheme.typography.bodySmall,
 					color =
 						if (isValid) {

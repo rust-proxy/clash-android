@@ -37,6 +37,11 @@ data class FileInfo(
 	val size: Long = 0,
 )
 
+data class VerificationResult(
+	val isValid: Boolean,
+	val detail: String?,
+)
+
 class ProfileViewModel(
 	application: Application,
 ) : AndroidViewModel(application) {
@@ -53,7 +58,7 @@ class ProfileViewModel(
 	var isVerifying by mutableStateOf(false)
 		private set
 
-	var verificationResult by mutableStateOf<String?>(null)
+	var verificationResult by mutableStateOf<VerificationResult?>(null)
 		private set
 
 	// Multiple profiles support
@@ -313,25 +318,19 @@ class ProfileViewModel(
 			false to formatEyreError(e)
 		}
 
-	fun verifyCurrentConfig(context: Context) {
-		if (savedFilePath == null) {
-			verificationResult = getApplication<Application>().getString(R.string.profile_not_found)
-			return
-		}
-
+	fun verifyCurrentConfig() {
+		val path = activeProfile?.filePath ?: savedFilePath
 		isVerifying = true
-		verificationResult = null
-
 		try {
-			val (isValid, content) = verify(savedFilePath!!)
 			verificationResult =
-				if (isValid) {
-					getApplication<Application>().getString(R.string.profile_verify_valid, content)
+				if (path == null) {
+					VerificationResult(false, null)
 				} else {
-					getApplication<Application>().getString(R.string.profile_verify_failed, content)
+					val (isValid, detail) = verify(path)
+					VerificationResult(isValid, detail)
 				}
 		} catch (e: Exception) {
-			verificationResult = e.message
+			verificationResult = VerificationResult(false, e.message ?: e.toString())
 		} finally {
 			isVerifying = false
 		}

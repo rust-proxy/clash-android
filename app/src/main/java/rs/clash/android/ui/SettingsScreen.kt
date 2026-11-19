@@ -74,10 +74,27 @@ import rs.clash.android.model.UI_SCALE_STEP
 import rs.clash.android.model.UiScale
 import rs.clash.android.ui.components.TextInfoDialog
 import rs.clash.android.util.PermissionHelper
+import rs.clash.android.viewmodel.AppFilterMode
 import rs.clash.android.viewmodel.DarkModePreference
 import rs.clash.android.viewmodel.LanguagePreference
 import rs.clash.android.viewmodel.SettingsViewModel
 import kotlin.math.roundToInt
+
+private val DarkModePreference.labelRes: Int
+	get() =
+		when (this) {
+			DarkModePreference.SYSTEM -> R.string.dark_mode_system
+			DarkModePreference.LIGHT -> R.string.dark_mode_light
+			DarkModePreference.DARK -> R.string.dark_mode_dark
+		}
+
+private val LanguagePreference.labelRes: Int
+	get() =
+		when (this) {
+			LanguagePreference.SYSTEM -> R.string.language_system
+			LanguagePreference.SIMPLIFIED_CHINESE -> R.string.language_simplified_chinese
+			LanguagePreference.ENGLISH -> R.string.language_english
+		}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Destination<RootGraph>
@@ -151,7 +168,7 @@ fun SettingsScreen(
 					SettingsItem(
 						icon = Icons.Default.DarkMode,
 						title = stringResource(R.string.settings_dark_mode),
-						subtitle = viewModel.getDarkModeDisplayName(),
+						subtitle = stringResource(viewModel.darkModePreference.labelRes),
 						onClick = {
 							showDarkModeDialog = true
 						},
@@ -172,7 +189,7 @@ fun SettingsScreen(
 					SettingsItem(
 						icon = Icons.Default.Language,
 						title = stringResource(R.string.settings_language),
-						subtitle = viewModel.getLanguageDisplayName(),
+						subtitle = stringResource(viewModel.languagePreference.labelRes),
 						onClick = {
 							showLanguageDialog = true
 						},
@@ -241,7 +258,12 @@ fun SettingsScreen(
 					SettingsItem(
 						icon = Icons.Default.FilterList,
 						title = stringResource(R.string.settings_app_filter),
-						subtitle = viewModel.getAppFilterSummary(),
+						subtitle =
+							when (viewModel.appFilterMode) {
+								AppFilterMode.ALL -> stringResource(R.string.app_selector_mode_all)
+								AppFilterMode.ALLOWED -> stringResource(R.string.app_selector_selected, viewModel.allowedApps.size)
+								AppFilterMode.DISALLOWED -> stringResource(R.string.app_selector_selected, viewModel.disallowedApps.size)
+							},
 						onClick = {
 							navigator.navigate(AppSelectorScreenDestination)
 						},
@@ -508,17 +530,17 @@ private fun DarkModeDialog(
 		text = {
 			Column(modifier = Modifier.selectableGroup()) {
 				PreferenceOption(
-					text = stringResource(R.string.dark_mode_system),
+					text = stringResource(DarkModePreference.SYSTEM.labelRes),
 					selected = selectedPreference == DarkModePreference.SYSTEM,
 					onClick = { selectedPreference = DarkModePreference.SYSTEM },
 				)
 				PreferenceOption(
-					text = stringResource(R.string.dark_mode_light),
+					text = stringResource(DarkModePreference.LIGHT.labelRes),
 					selected = selectedPreference == DarkModePreference.LIGHT,
 					onClick = { selectedPreference = DarkModePreference.LIGHT },
 				)
 				PreferenceOption(
-					text = stringResource(R.string.dark_mode_dark),
+					text = stringResource(DarkModePreference.DARK.labelRes),
 					selected = selectedPreference == DarkModePreference.DARK,
 					onClick = { selectedPreference = DarkModePreference.DARK },
 				)
@@ -580,17 +602,17 @@ private fun LanguageDialog(
 		text = {
 			Column(modifier = Modifier.selectableGroup()) {
 				LanguageOption(
-					text = stringResource(R.string.language_system),
+					text = stringResource(LanguagePreference.SYSTEM.labelRes),
 					selected = selectedPreference == LanguagePreference.SYSTEM,
 					onClick = { selectedPreference = LanguagePreference.SYSTEM },
 				)
 				LanguageOption(
-					text = stringResource(R.string.language_simplified_chinese),
+					text = stringResource(LanguagePreference.SIMPLIFIED_CHINESE.labelRes),
 					selected = selectedPreference == LanguagePreference.SIMPLIFIED_CHINESE,
 					onClick = { selectedPreference = LanguagePreference.SIMPLIFIED_CHINESE },
 				)
 				LanguageOption(
-					text = stringResource(R.string.language_english),
+					text = stringResource(LanguagePreference.ENGLISH.labelRes),
 					selected = selectedPreference == LanguagePreference.ENGLISH,
 					onClick = { selectedPreference = LanguagePreference.ENGLISH },
 				)

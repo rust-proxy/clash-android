@@ -8,7 +8,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
-import rs.clash.android.R
 import rs.clash.android.model.UI_SCALE_KEY
 import rs.clash.android.util.manualUiScale
 
@@ -65,7 +64,7 @@ class SettingsViewModel(
 	// The app filter is edited on a different screen (the app selector writes the same
 	// "settings" file through its own ViewModel instance), and this screen can come back
 	// without its ViewModel being recreated. Re-reading the three app-filter values whenever
-	// the file changes keeps `getAppFilterSummary()` from showing a stale count.
+	// the file changes keeps the displayed count current.
 	// The listener is deliberately stored in a field: SharedPreferences keeps registered
 	// listeners only weakly, so an inline listener could be collected and never called.
 	private val preferenceChangeListener =
@@ -174,41 +173,5 @@ class SettingsViewModel(
 	fun updateDisallowedApps(apps: Set<String>) {
 		disallowedApps = apps
 		prefs.edit { putStringSet("disallowed_apps", apps) }
-	}
-
-	fun getDarkModeDisplayName(): String {
-		val context = getApplication<Application>().applicationContext
-		return when (darkModePreference) {
-			DarkModePreference.SYSTEM -> context.getString(R.string.dark_mode_system)
-			DarkModePreference.LIGHT -> context.getString(R.string.dark_mode_light)
-			DarkModePreference.DARK -> context.getString(R.string.dark_mode_dark)
-		}
-	}
-
-	fun getLanguageDisplayName(): String {
-		val context = getApplication<Application>().applicationContext
-		return when (languagePreference) {
-			LanguagePreference.SYSTEM -> context.getString(R.string.language_system)
-			LanguagePreference.SIMPLIFIED_CHINESE -> context.getString(R.string.language_simplified_chinese)
-			LanguagePreference.ENGLISH -> context.getString(R.string.language_english)
-		}
-	}
-
-	fun getAppFilterModeDisplayName(): String {
-		val context = getApplication<Application>().applicationContext
-		return when (appFilterMode) {
-			AppFilterMode.ALL -> context.getString(R.string.app_selector_mode_all)
-			AppFilterMode.ALLOWED -> context.getString(R.string.app_selector_mode_allowed)
-			AppFilterMode.DISALLOWED -> context.getString(R.string.app_selector_mode_disallowed)
-		}
-	}
-
-	fun getAppFilterSummary(): String {
-		val context = getApplication<Application>().applicationContext
-		return when (appFilterMode) {
-			AppFilterMode.ALL -> context.getString(R.string.app_selector_mode_all)
-			AppFilterMode.ALLOWED -> context.getString(R.string.app_selector_selected, allowedApps.size)
-			AppFilterMode.DISALLOWED -> context.getString(R.string.app_selector_selected, disallowedApps.size)
-		}
 	}
 }

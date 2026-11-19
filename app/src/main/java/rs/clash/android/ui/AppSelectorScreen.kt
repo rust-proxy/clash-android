@@ -6,8 +6,9 @@ import android.graphics.drawable.Drawable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -50,6 +51,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,6 +81,8 @@ data class AppInfo(
 	val isSystemApp: Boolean,
 )
 
+private val packageSetSaver = Saver<Set<String>, ArrayList<String>>(save = { ArrayList(it) }, restore = { it.toSet() })
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Destination<RootGraph>
 @Composable
@@ -90,30 +95,18 @@ fun AppSelectorScreen(
 	val coroutineScope = rememberCoroutineScope()
 	var apps by remember { mutableStateOf<List<AppInfo>>(emptyList()) }
 	var isLoading by remember { mutableStateOf(true) }
-	var searchQuery by remember { mutableStateOf("") }
-	var showSystemApps by remember { mutableStateOf(false) }
-	var showModeDialog by remember { mutableStateOf(false) }
-	var tempFilterMode by remember { mutableStateOf(viewModel.appFilterMode) }
-	var selectedApps by remember {
+	var searchQuery by rememberSaveable { mutableStateOf("") }
+	var showSystemApps by rememberSaveable { mutableStateOf(false) }
+	var showModeDialog by rememberSaveable { mutableStateOf(false) }
+	var tempFilterMode by rememberSaveable { mutableStateOf(viewModel.appFilterMode) }
+	var selectedApps by rememberSaveable(tempFilterMode, stateSaver = packageSetSaver) {
 		mutableStateOf(
-			when (viewModel.appFilterMode) {
-				AppFilterMode.ALLOWED -> viewModel.allowedApps
-				AppFilterMode.DISALLOWED -> viewModel.disallowedApps
-				else -> emptySet()
-			},
-		)
-	}
-
-	// Switching the filter mode has to re-seed the working selection, otherwise the
-	// previously chosen package set leaks into the new mode (and switching back to
-	// "Allowed" shows nothing selected even though apps are configured).
-	LaunchedEffect(tempFilterMode) {
-		selectedApps =
 			when (tempFilterMode) {
 				AppFilterMode.ALLOWED -> viewModel.allowedApps
 				AppFilterMode.DISALLOWED -> viewModel.disallowedApps
 				AppFilterMode.ALL -> emptySet()
-			}
+			},
+		)
 	}
 
 	// Load apps when screen opens
@@ -155,6 +148,7 @@ fun AppSelectorScreen(
 		}
 
 	Scaffold(
+		modifier = modifier,
 		topBar = {
 			TopAppBar(
 				title = { Text(stringResource(R.string.app_selector_title)) },
@@ -195,126 +189,61 @@ fun AppSelectorScreen(
 			}
 		},
 	) { padding ->
-		Column(
-			modifier =
-				Modifier
-					.padding(padding)
-					.fillMaxSize(),
+		LazyColumn(
+			modifier = Modifier.padding(padding).fillMaxSize(),
+			contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 88.dp),
+			verticalArrangement = Arrangement.spacedBy(4.dp),
 		) {
-			// Filter Mode Selection
-			Card(
-				modifier =
-					Modifier
-						.fillMaxWidth()
-						.padding(horizontal = 16.dp, vertical = 8.dp),
-				elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-			) {
-				Column(
-					modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-				) {
-					Row(
-						modifier =
-							Modifier
-								.fillMaxWidth()
-								.clickable { showModeDialog = true },
-						horizontalArrangement = Arrangement.SpaceBetween,
-						verticalAlignment = Alignment.CenterVertically,
+			item(key = "filter-controls") {
+				BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+					FlowRow(
+						maxItemsInEachRow = if (maxWidth >= 600.dp) 2 else 1,
+						horizontalArrangement = Arrangement.spacedBy(12.dp),
+						verticalArrangement = Arrangement.spacedBy(4.dp),
 					) {
-						Column(modifier = Modifier.weight(1f)) {
-							Text(
-								text = stringResource(R.string.app_selector_mode),
-								style = MaterialTheme.typography.labelMedium,
-								color = MaterialTheme.colorScheme.primary,
+						FilterModeCard(
+							mode = tempFilterMode,
+							selectedCount = selectedApps.size,
+							onClick = { showModeDialog = true },
+							modifier = Modifier.weight(1f),
+						)
+						if (tempFilterMode != AppFilterMode.ALL) {
+							AppSearchControls(
+								searchQuery = searchQuery,
+								onSearchChange = { searchQuery = it },
+								showSystemApps = showSystemApps,
+								onShowSystemAppsChange = { showSystemApps = it },
+								modifier = Modifier.weight(1f),
 							)
-							Text(
-								text =
-									when (tempFilterMode) {
-										AppFilterMode.ALL -> stringResource(R.string.app_selector_mode_all)
-										AppFilterMode.ALLOWED -> stringResource(R.string.app_selector_mode_allowed)
-										AppFilterMode.DISALLOWED -> stringResource(R.string.app_selector_mode_disallowed)
-									},
-								style = MaterialTheme.typography.bodyMedium,
-							)
-							if (tempFilterMode != AppFilterMode.ALL) {
-								Text(
-									text = stringResource(R.string.app_selector_selected, selectedApps.size),
-									style = MaterialTheme.typography.bodySmall,
-									color = MaterialTheme.colorScheme.primary,
-								)
-							}
 						}
-						Icon(Icons.Default.Apps, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
 					}
 				}
 			}
-
-			// Search and Filter
-			if (tempFilterMode != AppFilterMode.ALL) {
-				Column(
-					modifier =
-						Modifier
-							.fillMaxWidth()
-							.padding(horizontal = 16.dp, vertical = 4.dp),
-					verticalArrangement = Arrangement.spacedBy(4.dp),
-				) {
-					TextField(
-						value = searchQuery,
-						onValueChange = { searchQuery = it },
-						modifier = Modifier.fillMaxWidth(),
-						placeholder = { Text(stringResource(R.string.app_selector_search)) },
-						leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-						singleLine = true,
-					)
-
-					Row(
-						verticalAlignment = Alignment.CenterVertically,
-						modifier = Modifier.clickable { showSystemApps = !showSystemApps },
-					) {
-						Switch(
-							checked = showSystemApps,
-							onCheckedChange = { showSystemApps = it },
-						)
-						Spacer(modifier = Modifier.width(4.dp))
-						Text(
-							text = stringResource(R.string.app_selector_system_apps),
-							style = MaterialTheme.typography.bodyMedium,
-						)
-					}
-				}
-			}
-
-			// Apps List
 			if (isLoading) {
-				Box(
-					modifier = Modifier.fillMaxSize(),
-					contentAlignment = Alignment.Center,
-				) {
-					Column(horizontalAlignment = Alignment.CenterHorizontally) {
+				item(key = "loading") {
+					Column(
+						modifier = Modifier.fillMaxWidth().padding(16.dp),
+						horizontalAlignment = Alignment.CenterHorizontally,
+					) {
 						CircularProgressIndicator()
 						Spacer(modifier = Modifier.height(16.dp))
 						Text(stringResource(R.string.app_selector_loading))
 					}
 				}
 			} else if (tempFilterMode != AppFilterMode.ALL) {
-				LazyColumn(
-					modifier = Modifier.fillMaxSize(),
-					contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-					verticalArrangement = Arrangement.spacedBy(4.dp),
-				) {
-					items(filteredApps, key = { it.packageName }) { app ->
-						AppListItem(
-							app = app,
-							isSelected = selectedApps.contains(app.packageName),
-							onToggle = {
-								selectedApps =
-									if (selectedApps.contains(app.packageName)) {
-										selectedApps - app.packageName
-									} else {
-										selectedApps + app.packageName
-									}
-							},
-						)
-					}
+				items(filteredApps, key = { it.packageName }) { app ->
+					AppListItem(
+						app = app,
+						isSelected = selectedApps.contains(app.packageName),
+						onToggle = {
+							selectedApps =
+								if (selectedApps.contains(app.packageName)) {
+									selectedApps - app.packageName
+								} else {
+									selectedApps + app.packageName
+								}
+						},
+					)
 				}
 			}
 		}
@@ -334,8 +263,6 @@ fun AppSelectorScreen(
 										.selectable(
 											selected = tempFilterMode == mode,
 											onClick = {
-												// The selection is re-seeded from the mode's
-												// stored app list by the LaunchedEffect above.
 												tempFilterMode = mode
 												showModeDialog = false
 											},
@@ -365,6 +292,95 @@ fun AppSelectorScreen(
 						Text(stringResource(R.string.cancel))
 					}
 				},
+			)
+		}
+	}
+}
+
+@Composable
+private fun FilterModeCard(
+	mode: AppFilterMode,
+	selectedCount: Int,
+	onClick: () -> Unit,
+	modifier: Modifier = Modifier,
+) {
+	Card(
+		modifier = modifier,
+		elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+	) {
+		Column(
+			modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+		) {
+			Row(
+				modifier =
+					Modifier
+						.fillMaxWidth()
+						.clickable(onClick = onClick),
+				horizontalArrangement = Arrangement.SpaceBetween,
+				verticalAlignment = Alignment.CenterVertically,
+			) {
+				Column(modifier = Modifier.weight(1f)) {
+					Text(
+						text = stringResource(R.string.app_selector_mode),
+						style = MaterialTheme.typography.labelMedium,
+						color = MaterialTheme.colorScheme.primary,
+					)
+					Text(
+						text =
+							when (mode) {
+								AppFilterMode.ALL -> stringResource(R.string.app_selector_mode_all)
+								AppFilterMode.ALLOWED -> stringResource(R.string.app_selector_mode_allowed)
+								AppFilterMode.DISALLOWED -> stringResource(R.string.app_selector_mode_disallowed)
+							},
+						style = MaterialTheme.typography.bodyMedium,
+					)
+					if (mode != AppFilterMode.ALL) {
+						Text(
+							text = stringResource(R.string.app_selector_selected, selectedCount),
+							style = MaterialTheme.typography.bodySmall,
+							color = MaterialTheme.colorScheme.primary,
+						)
+					}
+				}
+				Icon(Icons.Default.Apps, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+			}
+		}
+	}
+}
+
+@Composable
+private fun AppSearchControls(
+	searchQuery: String,
+	onSearchChange: (String) -> Unit,
+	showSystemApps: Boolean,
+	onShowSystemAppsChange: (Boolean) -> Unit,
+	modifier: Modifier = Modifier,
+) {
+	Column(
+		modifier = modifier,
+		verticalArrangement = Arrangement.spacedBy(4.dp),
+	) {
+		TextField(
+			value = searchQuery,
+			onValueChange = onSearchChange,
+			modifier = Modifier.fillMaxWidth(),
+			placeholder = { Text(stringResource(R.string.app_selector_search)) },
+			leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+			singleLine = true,
+		)
+
+		Row(
+			verticalAlignment = Alignment.CenterVertically,
+			modifier = Modifier.clickable { onShowSystemAppsChange(!showSystemApps) },
+		) {
+			Switch(
+				checked = showSystemApps,
+				onCheckedChange = onShowSystemAppsChange,
+			)
+			Spacer(modifier = Modifier.width(4.dp))
+			Text(
+				text = stringResource(R.string.app_selector_system_apps),
+				style = MaterialTheme.typography.bodyMedium,
 			)
 		}
 	}

@@ -195,13 +195,20 @@ private fun RuntimeRow(
 		verticalAlignment = Alignment.CenterVertically,
 	) {
 		Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
-		Column(modifier = Modifier.weight(1f)) {
-			Text(title, style = MaterialTheme.typography.titleSmall)
-			if (detail != null) {
-				Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+		FlowRow(
+			modifier = Modifier.weight(1f),
+			horizontalArrangement = Arrangement.SpaceBetween,
+			verticalArrangement = Arrangement.spacedBy(4.dp),
+			itemVerticalAlignment = Alignment.CenterVertically,
+		) {
+			Column(modifier = Modifier.padding(end = 8.dp)) {
+				Text(title, style = MaterialTheme.typography.titleSmall)
+				if (detail != null) {
+					Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+				}
 			}
+			Text(value, style = MaterialTheme.typography.titleMedium)
 		}
-		Text(value, style = MaterialTheme.typography.titleMedium)
 		if (showChevron) {
 			Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(18.dp))
 		}

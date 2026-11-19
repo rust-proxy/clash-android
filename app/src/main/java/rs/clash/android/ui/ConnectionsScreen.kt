@@ -10,7 +10,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -128,49 +128,14 @@ fun ConnectionsContent(
 						style = MaterialTheme.typography.titleMedium,
 						fontWeight = FontWeight.Bold,
 					)
-					Row(
+					FlowRow(
 						modifier = Modifier.fillMaxWidth(),
-						horizontalArrangement = Arrangement.SpaceBetween,
+						horizontalArrangement = Arrangement.spacedBy(16.dp),
+						verticalArrangement = Arrangement.spacedBy(12.dp),
 					) {
-						Column {
-							Text(
-								text = stringResource(R.string.connections_count),
-								style = MaterialTheme.typography.bodyMedium,
-								color = MaterialTheme.colorScheme.secondary,
-							)
-							Text(
-								text = "${connections.size}",
-								style = MaterialTheme.typography.titleLarge,
-								fontWeight = FontWeight.Bold,
-								color = MaterialTheme.colorScheme.primary,
-							)
-						}
-						Column(horizontalAlignment = Alignment.End) {
-							Text(
-								text = stringResource(R.string.stat_download),
-								style = MaterialTheme.typography.bodyMedium,
-								color = MaterialTheme.colorScheme.secondary,
-							)
-							Text(
-								text = formatSize(downloadTotal),
-								style = MaterialTheme.typography.titleLarge,
-								fontWeight = FontWeight.Bold,
-								color = MaterialTheme.colorScheme.primary,
-							)
-						}
-						Column(horizontalAlignment = Alignment.End) {
-							Text(
-								text = stringResource(R.string.stat_upload),
-								style = MaterialTheme.typography.bodyMedium,
-								color = MaterialTheme.colorScheme.secondary,
-							)
-							Text(
-								text = formatSize(uploadTotal),
-								style = MaterialTheme.typography.titleLarge,
-								fontWeight = FontWeight.Bold,
-								color = MaterialTheme.colorScheme.primary,
-							)
-						}
+						ConnectionMetric(stringResource(R.string.connections_count), connections.size.toString())
+						ConnectionMetric(stringResource(R.string.stat_download), formatSize(downloadTotal))
+						ConnectionMetric(stringResource(R.string.stat_upload), formatSize(uploadTotal))
 					}
 				}
 			}
@@ -242,5 +207,16 @@ fun ConnectionsContent(
 				ConnectionItem(connection = connection)
 			}
 		}
+	}
+}
+
+@Composable
+private fun ConnectionMetric(
+	label: String,
+	value: String,
+) {
+	Column {
+		Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+		Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
 	}
 }
