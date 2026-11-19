@@ -8,8 +8,7 @@ plugins {
 	alias(libs.plugins.ksp) apply false
 	alias(libs.plugins.ktlint) apply false
 }
-val buildToolsVersion by extra("37.0.0")
-val ndkVersion by extra("30.0.16248370")
+extra["buildToolsVersion"] = "37.0.0"
 
 allprojects {
 	repositories {

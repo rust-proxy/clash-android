@@ -11,7 +11,7 @@ android {
     namespace = "rs.clash.android.ffi"
     compileSdk = 37
 
-    ndkVersion = rootProject.extra["ndkVersion"] as String
+	ndkVersion = providers.gradleProperty("clashNdkVersion").get()
     buildToolsVersion = rootProject.extra["buildToolsVersion"] as String
     defaultConfig {
         minSdk = 23

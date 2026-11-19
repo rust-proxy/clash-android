@@ -16,8 +16,9 @@ defaults:
     shell: bash
 
 env:
-  RUST_TOOLCHAIN: "stable"
   RUSTC_BOOTSTRAP: "1"
+  SCCACHE_GHA_ENABLED: "true"
+  AWS_LC_SYS_PREBUILT_NASM: "1"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || (github.event_name == 'workflow_dispatch' && github.run_id) || github.ref }}
@@ -42,27 +43,23 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6.4.1
       
-      - name: Make gradlew executable
-        run: chmod +x gradlew
-      
       - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@stable
+        id: rust
         with:
-          toolchain: stable
-          targets: "x86_64-unknown-linux-gnu"
-          components: "rustfmt,clippy,rust-src"
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
 
       - name: Setup Android NDK
-        uses: nttld/setup-ndk@v1.6.0
-        with:
-          ndk-version: r30
-
-      - name: Add Rust Android targets
         run: |
-          rustup target add aarch64-linux-android
-          rustup target add armv7-linux-androideabi
-          rustup target add i686-linux-android
-          rustup target add x86_64-linux-android
+          revision=$(sed -n 's/^clashNdkVersion=//p' gradle.properties)
+          : "${revision:?Missing clashNdkVersion in gradle.properties}"
+          ndk="$ANDROID_HOME/ndk/$revision"
+          if [[ ! -f "$ndk/source.properties" ]]; then
+            sdkmanager "ndk;$revision"
+          fi
+          echo "ANDROID_NDK_HOME=$ndk" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$ndk" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK=$ndk" >> "$GITHUB_ENV"
 
       - name: Setup sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.11
@@ -71,21 +68,24 @@ jobs:
         with:
           tool: cargo-ndk,just
 
-      - name: Cache Gradle dependencies
+      - name: Identify binding generator inputs
+        id: generator
+        run: |
+          echo "sources=$(git rev-parse HEAD:uniffi)" >> "$GITHUB_OUTPUT"
+          echo "cargo-ndk=$(cargo ndk --version)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache generated Kotlin bindings
+        id: bindings
         uses: actions/cache@v6.1.0
         with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
+          path: core/src/main/java/uniffi
+          key: bindings-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust.outputs.cachekey }}-${{ steps.generator.outputs.cargo-ndk }}-${{ steps.generator.outputs.sources }}-${{ hashFiles('.cargo/**', 'justfile', 'gradle.properties', '.github/workflows/ci.yml') }}
 
-      - name: Setup SCCache & AWS-LC-RS prebuilt NASM objects
-        run: |
-          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-          echo "AWS_LC_SYS_PREBUILT_NASM=1" >> $GITHUB_ENV
+      - name: Generate Rust bindings
+        if: steps.bindings.outputs.cache-hit != 'true'
+        env:
+          RUSTC_WRAPPER: sccache
+        run: just generate-bindings --locked
 
       - name: Decode Keystore
         if: github.event_name != 'pull_request'
@@ -104,14 +104,10 @@ jobs:
             echo "version=dev-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
           fi
 
-      - name: Generate Rust bindings
-        run: |
-          just generate-bindings
-
       - name: Build Debug APK
         if: github.event_name == 'pull_request'
         run: |
-          ./gradlew app:assembleDebug
+          ./gradlew --build-cache app:assembleDebug
 
       - name: Build Release APKs
         if: github.event_name != 'pull_request'
@@ -124,7 +120,7 @@ jobs:
           ANDROID_SPLIT_ABI_UNIVERSAL_APK: true
         run: |
           rm -rf app/build/outputs/apk
-          ./gradlew app:assembleRelease
+          ./gradlew --build-cache app:assembleRelease
 
       - name: Organize APKs
         if: github.event_name != 'pull_request'
@@ -196,7 +192,7 @@ jobs:
 
       - name: Generate a changelog
         if: github.event_name != 'pull_request'
-        uses: orhun/git-cliff-action@main
+        uses: orhun/git-cliff-action@v4.9.1
         id: git-cliff
         with:
           config: .github/cliff.toml

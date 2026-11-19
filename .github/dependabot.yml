@@ -1,11 +1,19 @@
 version: 2
 updates:
   - package-ecosystem: "cargo"
-    directory: "/"
+    directory: "/uniffi"
     schedule:
       interval: monthly
     groups:
       rust-dependencies:
+        patterns:
+          - "*"
+  - package-ecosystem: "gradle"
+    directory: "/"
+    schedule:
+      interval: monthly
+    groups:
+      gradle-dependencies:
         patterns:
           - "*"
   - package-ecosystem: "github-actions"
