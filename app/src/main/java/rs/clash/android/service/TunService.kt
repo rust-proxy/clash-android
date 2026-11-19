@@ -43,9 +43,14 @@ class TunService : VpnService() {
 	private val control =
 		Messenger(
 			Handler(Looper.getMainLooper()) { message ->
-				if (message.what == ProxySession.SUBSCRIBE && message.sendingUid == Process.myUid()) {
-					observer = message.replyTo
-					sendState()
+				if (message.sendingUid == Process.myUid()) {
+					when (message.what) {
+						ProxySession.SUBSCRIBE -> {
+							observer = message.replyTo
+							sendState()
+						}
+						ProxySession.STOP_FOR_RESTART -> stopSession()
+					}
 				}
 				true
 			},

@@ -30,6 +30,8 @@ data class HomeUiState(
 sealed interface HomeAction {
 	data object StartVpn : HomeAction
 
+	data object RestartVpn : HomeAction
+
 	data object StopVpn : HomeAction
 
 	data class PermissionResult(
@@ -55,6 +57,7 @@ class HomeViewModel(
 	private val state = MutableStateFlow(HomeUiState(isVpnRunning = vpn.session.value.running))
 	val uiState = state.asStateFlow()
 	private val effectChannel = Channel<HomeEffect>(Channel.BUFFERED)
+	private var restartAfterPermission = false
 	val effects = effectChannel.receiveAsFlow()
 
 	init {
@@ -73,16 +76,43 @@ class HomeViewModel(
 	fun onAction(action: HomeAction) {
 		when (action) {
 			HomeAction.StartVpn -> startVpn()
+			HomeAction.RestartVpn -> startVpn(restart = true)
 			HomeAction.StopVpn -> vpn.stop()
-			is HomeAction.PermissionResult -> if (action.granted) startVpn()
+			is HomeAction.PermissionResult -> {
+				val restart = restartAfterPermission && vpn.session.value.running
+				restartAfterPermission = false
+				if (action.granted) startVpn(restart)
+			}
 		}
 	}
 
-	private fun startVpn() {
-		when (val result = vpn.start()) {
+	private fun startVpn(restart: Boolean = false) {
+		if (restart) {
+			viewModelScope.launch {
+				try {
+					handleStartResult(vpn.restart(), restart = true)
+				} catch (e: CancellationException) {
+					throw e
+				} catch (e: Exception) {
+					effectChannel.send(HomeEffect.Message(R.string.home_restart_failed, e.localizedMessage ?: e.toString()))
+				}
+			}
+		} else {
+			handleStartResult(vpn.start(), restart = false)
+		}
+	}
+
+	private fun handleStartResult(
+		result: VpnStartResult,
+		restart: Boolean,
+	) {
+		when (result) {
 			VpnStartResult.Started -> Unit
 			VpnStartResult.MissingProfile -> effectChannel.trySend(HomeEffect.Message(R.string.home_select_profile_first))
-			is VpnStartResult.PermissionRequired -> effectChannel.trySend(HomeEffect.RequestVpnPermission(result.intent))
+			is VpnStartResult.PermissionRequired -> {
+				restartAfterPermission = restart
+				effectChannel.trySend(HomeEffect.RequestVpnPermission(result.intent))
+			}
 		}
 	}
 

@@ -1,7 +1,6 @@
 package rs.clash.android.ui
 
 import android.app.Activity.RESULT_OK
-import android.content.Intent
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -120,7 +119,7 @@ fun HomeScreen(
 				TextButton(
 					onClick = {
 						showRestartDialog = false
-						restartApp(context)
+						viewModel.onAction(HomeAction.RestartVpn)
 					},
 				) {
 					Text(stringResource(R.string.confirm))
@@ -170,6 +169,7 @@ fun HomeScreen(
 							)
 							DropdownMenuItem(
 								text = { Text(stringResource(R.string.action_restart)) },
+								enabled = isVpnRunning,
 								onClick = {
 									showActions = false
 									showRestartDialog = true
@@ -284,11 +284,4 @@ private fun OverviewHeading(title: String) {
 		modifier = Modifier.padding(start = 4.dp, top = 8.dp),
 		style = MaterialTheme.typography.titleMedium,
 	)
-}
-
-private fun restartApp(context: android.content.Context) {
-	val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-	intent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
-	context.startActivity(intent)
-	android.os.Process.killProcess(android.os.Process.myPid())
 }

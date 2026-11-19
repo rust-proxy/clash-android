@@ -120,9 +120,10 @@
     <string name="action_more">More options</string>
     <string name="action_exit_ui_keep_vpn">Exit interface, keep VPN running</string>
     <string name="exit_ui_profile_busy">A profile is downloading or updating. You can exit when it finishes.</string>
-    <string name="action_restart">Restart App</string>
-    <string name="restart_confirm_title">Confirm Restart</string>
-    <string name="restart_confirm_message">Are you sure you want to restart the app?</string>
+    <string name="action_restart">Restart proxy</string>
+    <string name="home_restart_failed">Failed to restart proxy: %1$s</string>
+    <string name="restart_confirm_title">Restart proxy?</string>
+    <string name="restart_confirm_message">The VPN will reconnect using the current configuration. Existing proxy connections will close.</string>
     <string name="confirm">Confirm</string>
     <string name="profile_update_proxy_configured">This update will use the configured HTTP proxy: %1$s</string>
     <string name="profile_update_proxy_clash">Clash is running. This update will use its HTTP proxy: %1$s</string>

@@ -119,9 +119,10 @@
     <string name="action_more">更多选项</string>
     <string name="action_exit_ui_keep_vpn">退出界面，保持 VPN 运行</string>
     <string name="exit_ui_profile_busy">配置下载或更新中，请在完成后退出界面。</string>
-    <string name="action_restart">重启应用</string>
-    <string name="restart_confirm_title">确认重启</string>
-    <string name="restart_confirm_message">确定要重启应用吗？</string>
+    <string name="action_restart">重启代理</string>
+    <string name="home_restart_failed">重启代理失败：%1$s</string>
+    <string name="restart_confirm_title">重启代理？</string>
+    <string name="restart_confirm_message">将使用当前配置重新连接 VPN，现有代理连接会中断。</string>
     <string name="confirm">确认</string>
 
     <!-- Profile Screen -->

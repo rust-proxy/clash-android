@@ -4,6 +4,11 @@ import android.content.Context
 import android.content.Intent
 import android.net.VpnService
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -37,6 +42,8 @@ interface VpnController {
 
 	fun start(): VpnStartResult
 
+	suspend fun restart(): VpnStartResult
+
 	fun stop()
 }
 
@@ -49,6 +56,8 @@ internal class AndroidVpnController(
 	private val context: Context,
 ) : VpnController {
 	private val proxy = ProxySession(context)
+	private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+	private var restarting: Deferred<VpnStartResult>? = null
 	override val session = proxy.state
 
 	override fun attach() = proxy.attach()
@@ -56,7 +65,22 @@ internal class AndroidVpnController(
 	override fun detach() = proxy.detach()
 
 	override fun start(): VpnStartResult {
-		if (session.value.running) return VpnStartResult.Started
+		if (session.value.running || restarting?.isActive == true) return VpnStartResult.Started
+		return withStartIntent { ContextCompat.startForegroundService(context, it) }
+	}
+
+	override suspend fun restart(): VpnStartResult {
+		restarting?.takeIf { it.isActive }?.let { return it.await() }
+		if (!session.value.running) return VpnStartResult.Started
+		val task =
+			scope.async {
+				withStartIntent { proxy.restart(it) }
+			}
+		restarting = task
+		return task.await()
+	}
+
+	private inline fun withStartIntent(launch: (Intent) -> Unit): VpnStartResult {
 		val path = context.getSharedPreferences("file_prefs", Context.MODE_PRIVATE).getString("profile_path", null)
 		if (path.isNullOrEmpty()) return VpnStartResult.MissingProfile
 		val permissionIntent = VpnService.prepare(context)
@@ -76,12 +100,12 @@ internal class AndroidVpnController(
 				.put("apps", JSONArray(apps.orEmpty()))
 				.put("fakeIp", prefs.getBoolean("fake_ip", false))
 				.put("ipv6", prefs.getBoolean("ipv6", true))
-		val intent = Intent(context, TunService::class.java).putExtra(TunService.CONFIG, config.toString())
-		ContextCompat.startForegroundService(context, intent)
+		launch(Intent(context, TunService::class.java).putExtra(TunService.CONFIG, config.toString()))
 		return VpnStartResult.Started
 	}
 
 	override fun stop() {
+		restarting?.cancel()
 		context.startService(Intent(context, TunService::class.java).setAction(TunService.STOP))
 	}
 }

@@ -494,6 +494,19 @@ class PageStateTest {
 		}
 
 	@Test
+	fun restartUsesTheProxyControllerAndReportsMissingProfile() =
+		runBlocking {
+			val vpn = FakeVpn(running = true)
+			val home = home(FakeOverview(), vpn)
+			vpn.result = VpnStartResult.MissingProfile
+			home.onAction(HomeAction.RestartVpn)
+			assertEquals(1, vpn.restarts)
+			assertEquals(0, vpn.starts)
+			assertEquals(0, vpn.stops)
+			assertEquals(HomeEffect.Message(R.string.home_select_profile_first), home.effects.first())
+		}
+
+	@Test
 	fun deniedPermissionDoesNotStartVpnAndApprovedPermissionRechecksTheProfile() =
 		runBlocking {
 			val vpn = FakeVpn()
@@ -654,6 +667,7 @@ private class FakeVpn(
 ) : VpnController {
 	override val session = MutableStateFlow(VpnSessionState(running))
 	var starts = 0
+	var restarts = 0
 	var stops = 0
 	var result: VpnStartResult = VpnStartResult.Started
 
@@ -663,6 +677,11 @@ private class FakeVpn(
 
 	override fun start(): VpnStartResult {
 		starts++
+		return result
+	}
+
+	override suspend fun restart(): VpnStartResult {
+		restarts++
 		return result
 	}
 
