@@ -1,12 +1,15 @@
 package rs.clash.android
 
 import android.Manifest
+import android.app.ActivityManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.os.Process
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -17,17 +20,18 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.graphics.luminance
 import androidx.core.content.ContextCompat
+import rs.clash.android.data.AppData
 import rs.clash.android.theme.ClashAndroidTheme
 import rs.clash.android.util.manualUiScale
 import rs.clash.android.util.recommendedUiScale
+import rs.clash.android.viewmodel.ProfileViewModel
 import java.util.Locale
 import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
+	private var exitUiRequested = false
 	internal var recommendedScale: Int = 100
 		private set
-
-	external fun javaInit(context: Context)
 
 	private val notificationPermissionLauncher =
 		registerForActivityResult(
@@ -65,8 +69,6 @@ class MainActivity : ComponentActivity() {
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
-		System.loadLibrary("clash_android_ffi")
-		javaInit(this)
 
 		// Request notification permission (Android 13+)
 		requestNotificationPermission()
@@ -88,6 +90,33 @@ class MainActivity : ComponentActivity() {
 				}
 			}
 		}
+	}
+
+	override fun onStart() {
+		super.onStart()
+		AppData.vpn.attach()
+	}
+
+	override fun onStop() {
+		AppData.vpn.detach()
+		super.onStop()
+	}
+
+	internal fun exitUiKeepingVpn() {
+		if (ProfileViewModel.hasActiveDownloads) {
+			Toast.makeText(this, R.string.exit_ui_profile_busy, Toast.LENGTH_SHORT).show()
+			return
+		}
+		exitUiRequested = true
+		// A second UI task could otherwise be resumed when this window finishes.
+		getSystemService(ActivityManager::class.java).appTasks.forEach { it.finishAndRemoveTask() }
+		finish()
+	}
+
+	override fun onDestroy() {
+		super.onDestroy()
+		// Normal backgrounding and configuration changes keep the UI process available.
+		if (exitUiRequested && isFinishing) Process.killProcess(Process.myPid())
 	}
 
 	private fun requestNotificationPermission() {

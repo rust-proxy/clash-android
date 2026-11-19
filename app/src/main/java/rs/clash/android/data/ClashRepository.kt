@@ -2,6 +2,8 @@ package rs.clash.android.data
 
 import kotlinx.coroutines.CancellationException
 import rs.clash.android.Global
+import rs.clash.android.service.AndroidVpnController
+import rs.clash.android.service.VpnController
 import uniffi.clash_android_ffi.ClashController
 import uniffi.clash_android_ffi.ConnectionsResponse
 import uniffi.clash_android_ffi.EyreException
@@ -48,6 +50,7 @@ interface ConnectionsRepository {
 
 /** Application-scoped controller access. Page state and polling belong to the caller. */
 object AppData {
+	val vpn: VpnController by lazy { AndroidVpnController(Global.application) }
 	val core by lazy { FfiClashRepository("${Global.application.cacheDir}/clash.sock") }
 }
 

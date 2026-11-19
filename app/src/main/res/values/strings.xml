@@ -63,8 +63,6 @@
     <string name="ui_scale_percent">%1$d%%</string>
     <string name="settings_language">语言</string>
     <string name="settings_general">常规</string>
-    <string name="settings_foreground_service">前台保活</string>
-    <string name="settings_foreground_service_desc">通过前台服务保持应用运行</string>
     <string name="settings_fake_ip">启用 Fake IP</string>
     <string name="settings_fake_ip_desc">使用虚拟 IP 地址进行 DNS 解析，提高性能</string>
     <string name="settings_ipv6">启用 IPv6</string>
@@ -118,6 +116,9 @@
     
     <!-- TopBar Actions -->
     <string name="action_about">关于</string>
+    <string name="action_more">更多选项</string>
+    <string name="action_exit_ui_keep_vpn">退出界面，保持 VPN 运行</string>
+    <string name="exit_ui_profile_busy">配置下载或更新中，请在完成后退出界面。</string>
     <string name="action_restart">重启应用</string>
     <string name="restart_confirm_title">确认重启</string>
     <string name="restart_confirm_message">确定要重启应用吗？</string>
@@ -169,7 +170,7 @@
 
     <!-- Known issues -->
     <string name="known_issues_title">已知问题</string>
-    <string name="known_issues_home">- 目前 clash-rs 的优雅退出存在一些 bug, 为了正确性目前关闭 VPN 时会自动重启应用。</string>
-    <string name="known_issues_profile">- 目前 clash-rs 并非100%兼容 mihomo 的配置文件, 应用配置文件前可先检验配置文件合法性。\n- 切换配置文件后需要重启应用。</string>
+    <string name="known_issues_home">VPN 在独立进程中运行。重新打开应用即可管理当前连接。</string>
+    <string name="known_issues_profile">- 目前 clash-rs 并非100%兼容 mihomo 的配置文件, 应用配置文件前可先检验配置文件合法性。\n- 切换配置文件后，重新连接 VPN 即可生效。</string>
     <string name="known_issues_settings">- 有些配置项需要重启 VPN 才可生效。</string>
 </resources>

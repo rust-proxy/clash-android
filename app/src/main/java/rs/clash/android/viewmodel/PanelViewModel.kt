@@ -13,7 +13,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -21,11 +20,12 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import rs.clash.android.Global
 import rs.clash.android.R
 import rs.clash.android.data.AppData
 import rs.clash.android.data.ProxyInfo
 import rs.clash.android.data.ProxyRepository
+import rs.clash.android.service.VpnController
+import rs.clash.android.service.runningChanges
 
 sealed interface ProxyDelay {
 	data object Testing : ProxyDelay
@@ -69,9 +69,9 @@ data class PanelMessage(
 
 class PanelViewModel(
 	private val repository: ProxyRepository = AppData.core,
-	private val running: StateFlow<Boolean> = Global.isServiceRunning,
+	private val vpn: VpnController = AppData.vpn,
 ) : ViewModel() {
-	private val state = MutableStateFlow(PanelUiState(isVpnRunning = running.value))
+	private val state = MutableStateFlow(PanelUiState(isVpnRunning = vpn.session.value.running))
 	val uiState = state.asStateFlow()
 	private val actions = MutableSharedFlow<PanelAction>(extraBufferCapacity = 64)
 	private val messages = Channel<PanelMessage>(Channel.BUFFERED)
@@ -83,7 +83,7 @@ class PanelViewModel(
 		// Invalidate cached data across VPN sessions, even while this tab is hidden.
 		// This observer does not perform controller requests.
 		viewModelScope.launch {
-			running.collect { enabled ->
+			vpn.runningChanges.collect { enabled ->
 				updateRunningState(enabled)
 			}
 		}
@@ -101,7 +101,7 @@ class PanelViewModel(
 
 	/** Hidden/stopped pages have no action subscriber and cancel all outstanding work. */
 	suspend fun observe() {
-		running.collectLatest { enabled ->
+		vpn.runningChanges.collectLatest { enabled ->
 			updateRunningState(enabled)
 			if (enabled) {
 				coroutineScope {
@@ -122,7 +122,7 @@ class PanelViewModel(
 					try {
 						repository.selectProxy(action.groupName, action.proxyName)
 						currentCoroutineContext().ensureActive()
-						if (running.value) loadProxies()
+						if (vpn.session.value.running) loadProxies()
 					} catch (e: CancellationException) {
 						throw e
 					} catch (e: Exception) {
@@ -150,7 +150,7 @@ class PanelViewModel(
 	}
 
 	private suspend fun loadProxies(retryOnFailure: Boolean = false) {
-		if (!running.value) return
+		if (!vpn.session.value.running) return
 		state.update { it.copy(isRefreshing = true) }
 		try {
 			val proxies =
@@ -166,7 +166,7 @@ class PanelViewModel(
 					repository.getProxies()
 				}
 			currentCoroutineContext().ensureActive()
-			if (!running.value) return
+			if (!vpn.session.value.running) return
 			state.update { current ->
 				val delays =
 					proxies
@@ -182,7 +182,7 @@ class PanelViewModel(
 			throw e
 		} catch (e: Exception) {
 			currentCoroutineContext().ensureActive()
-			if (running.value) state.update { it.copy(hasLoaded = true) }
+			if (vpn.session.value.running) state.update { it.copy(hasLoaded = true) }
 			reportError(R.string.home_api_error, e)
 		} finally {
 			state.update { it.copy(isRefreshing = false) }
@@ -196,12 +196,12 @@ class PanelViewModel(
 			state.update { it.copy(delays = it.delays + (name to ProxyDelay.Testing)) }
 			val delay = repository.getProxyDelay(name)
 			currentCoroutineContext().ensureActive()
-			if (running.value) state.update { it.copy(delays = it.delays + (name to ProxyDelay.Measured(delay))) }
+			if (vpn.session.value.running) state.update { it.copy(delays = it.delays + (name to ProxyDelay.Measured(delay))) }
 		} catch (e: CancellationException) {
 			throw e
 		} catch (e: Exception) {
 			currentCoroutineContext().ensureActive()
-			if (running.value) state.update { it.copy(delays = it.delays + (name to ProxyDelay.Timeout)) }
+			if (vpn.session.value.running) state.update { it.copy(delays = it.delays + (name to ProxyDelay.Timeout)) }
 		} finally {
 			testing.remove(name)
 			state.update { current ->
@@ -220,6 +220,6 @@ class PanelViewModel(
 		error: Exception,
 	) {
 		currentCoroutineContext().ensureActive()
-		if (running.value) messages.send(PanelMessage(resource, error.message ?: error.toString()))
+		if (vpn.session.value.running) messages.send(PanelMessage(resource, error.message ?: error.toString()))
 	}
 }

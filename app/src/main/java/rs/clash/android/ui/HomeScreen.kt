@@ -2,9 +2,11 @@ package rs.clash.android.ui
 
 import android.app.Activity.RESULT_OK
 import android.content.Intent
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -17,8 +19,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -48,6 +52,7 @@ import com.ramcosta.composedestinations.annotation.RootGraph
 import com.ramcosta.composedestinations.generated.destinations.ConnectionsScreenDestination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import kotlinx.coroutines.launch
+import rs.clash.android.MainActivity
 import rs.clash.android.R
 import rs.clash.android.data.MemoryUsage
 import rs.clash.android.formatSize
@@ -70,6 +75,8 @@ fun HomeScreen(
 	viewModel: HomeViewModel = viewModel(),
 ) {
 	val context = LocalContext.current
+	val activity = LocalActivity.current as? MainActivity
+	var showActions by remember { mutableStateOf(false) }
 	var showRestartDialog by remember { mutableStateOf(false) }
 	var showInfoDialog by remember { mutableStateOf(false) }
 
@@ -98,7 +105,6 @@ fun HomeScreen(
 						showMessage(
 							if (effect.detail == null) context.getString(effect.resource) else context.getString(effect.resource, effect.detail),
 						)
-					HomeEffect.RestartApp -> restartApp(context)
 				}
 			}
 		}
@@ -149,11 +155,27 @@ fun HomeScreen(
 							contentDescription = stringResource(R.string.action_about),
 						)
 					}
-					IconButton(onClick = { showRestartDialog = true }) {
-						Icon(
-							imageVector = Icons.Filled.Refresh,
-							contentDescription = stringResource(R.string.action_restart),
-						)
+					Box {
+						IconButton(onClick = { showActions = true }) {
+							Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.action_more))
+						}
+						DropdownMenu(expanded = showActions, onDismissRequest = { showActions = false }) {
+							DropdownMenuItem(
+								text = { Text(stringResource(R.string.action_exit_ui_keep_vpn)) },
+								enabled = isVpnRunning && activity != null,
+								onClick = {
+									showActions = false
+									activity?.exitUiKeepingVpn()
+								},
+							)
+							DropdownMenuItem(
+								text = { Text(stringResource(R.string.action_restart)) },
+								onClick = {
+									showActions = false
+									showRestartDialog = true
+								},
+							)
+						}
 					}
 				},
 				windowInsets = WindowInsets(),

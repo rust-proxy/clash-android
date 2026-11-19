@@ -28,7 +28,6 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Router
-import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -204,22 +203,9 @@ fun SettingsScreen(
 
 			item {
 				SettingsCard {
-					SettingsSwitchItem(
-						icon = Icons.Default.Shield,
-						title = stringResource(R.string.settings_foreground_service),
-						subtitle = stringResource(R.string.settings_foreground_service_desc),
-						checked = viewModel.foregroundServiceEnabled,
-						onCheckedChange = { enabled ->
-							viewModel.updateForegroundServiceEnabled(enabled)
-						},
-					)
-
-					// Show notification permission prompt if Android 13+ and foreground service is enabled
 					if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-						viewModel.foregroundServiceEnabled &&
 						!hasNotificationPermission
 					) {
-						HorizontalDivider(modifier = Modifier.padding(start = 56.dp))
 						SettingsItem(
 							icon = Icons.Default.Notifications,
 							title = stringResource(R.string.settings_notification_permission),
@@ -230,9 +216,9 @@ fun SettingsScreen(
 							},
 							showChevron = true,
 						)
+						HorizontalDivider(modifier = Modifier.padding(start = 56.dp))
 					}
 
-					HorizontalDivider(modifier = Modifier.padding(start = 56.dp))
 					SettingsSwitchItem(
 						icon = Icons.Default.Dns,
 						title = stringResource(R.string.settings_fake_ip),

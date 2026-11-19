@@ -20,14 +20,4 @@ object PermissionHelper {
 			// Android 13 以下不需要动态请求通知权限
 			true
 		}
-
-	/**
-	 * 检查前台服务是否启用且有通知权限
-	 */
-	fun canShowForegroundNotification(context: Context): Boolean {
-		val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-		val foregroundServiceEnabled = prefs.getBoolean("foreground_service_enabled", false)
-
-		return foregroundServiceEnabled && hasNotificationPermission(context)
-	}
 }

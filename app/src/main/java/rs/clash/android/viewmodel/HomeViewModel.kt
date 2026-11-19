@@ -9,7 +9,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -17,9 +17,9 @@ import rs.clash.android.R
 import rs.clash.android.data.AppData
 import rs.clash.android.data.Overview
 import rs.clash.android.data.OverviewRepository
-import rs.clash.android.service.AndroidVpnController
 import rs.clash.android.service.VpnController
 import rs.clash.android.service.VpnStartResult
+import rs.clash.android.service.runningChanges
 
 data class HomeUiState(
 	val isVpnRunning: Boolean = false,
@@ -46,15 +46,13 @@ sealed interface HomeEffect {
 		val resource: Int,
 		val detail: String? = null,
 	) : HomeEffect
-
-	data object RestartApp : HomeEffect
 }
 
 class HomeViewModel(
 	private val overviewRepository: OverviewRepository = AppData.core,
-	private val vpn: VpnController = AndroidVpnController(),
+	private val vpn: VpnController = AppData.vpn,
 ) : ViewModel() {
-	private val state = MutableStateFlow(HomeUiState(isVpnRunning = vpn.running.value))
+	private val state = MutableStateFlow(HomeUiState(isVpnRunning = vpn.session.value.running))
 	val uiState = state.asStateFlow()
 	private val effectChannel = Channel<HomeEffect>(Channel.BUFFERED)
 	val effects = effectChannel.receiveAsFlow()
@@ -62,7 +60,7 @@ class HomeViewModel(
 	init {
 		// Keep service state current while hidden without polling the controller.
 		viewModelScope.launch {
-			vpn.running.collect { updateRunningState(it) }
+			vpn.runningChanges.collect { updateRunningState(it) }
 		}
 	}
 
@@ -75,10 +73,7 @@ class HomeViewModel(
 	fun onAction(action: HomeAction) {
 		when (action) {
 			HomeAction.StartVpn -> startVpn()
-			HomeAction.StopVpn -> {
-				vpn.stop()
-				effectChannel.trySend(HomeEffect.RestartApp)
-			}
+			HomeAction.StopVpn -> vpn.stop()
 			is HomeAction.PermissionResult -> if (action.granted) startVpn()
 		}
 	}
@@ -93,26 +88,24 @@ class HomeViewModel(
 
 	/** The resumed destination owns this collection, including in-flight FFI requests. */
 	suspend fun observe() {
-		vpn.running.collectLatest { running ->
-			updateRunningState(running)
-			if (running) {
-				// Only a new VPN session needs the controller startup grace period.
-				val initialDelay = if (state.value.hasLoadedOverview) 0L else 1000L
-				pollWhileServiceRunning(vpn.running, 3000, initialDelay, ::refreshOverview)
-			}
-		}
+		pollWhileServiceRunning(
+			vpn.runningChanges.onEach(::updateRunningState),
+			intervalMillis = 3000,
+			initialDelayMillis = { if (state.value.hasLoadedOverview) 0L else 1000L },
+			refresh = ::refreshOverview,
+		)
 	}
 
 	private suspend fun refreshOverview() {
 		try {
 			val overview = overviewRepository.getOverview()
 			currentCoroutineContext().ensureActive()
-			if (vpn.running.value) state.update { it.copy(overview = overview, hasLoadedOverview = true) }
+			if (vpn.session.value.running) state.update { it.copy(overview = overview, hasLoadedOverview = true) }
 		} catch (e: CancellationException) {
 			throw e
 		} catch (e: Exception) {
 			currentCoroutineContext().ensureActive()
-			if (vpn.running.value) {
+			if (vpn.session.value.running) {
 				effectChannel.send(HomeEffect.Message(R.string.home_stats_error, e.message ?: e.toString()))
 			}
 		}

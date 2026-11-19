@@ -43,9 +43,6 @@ class SettingsViewModel(
 	var languagePreference: LanguagePreference by mutableStateOf(loadLanguagePreference())
 		private set
 
-	var foregroundServiceEnabled: Boolean by mutableStateOf(loadForegroundServiceEnabled())
-		private set
-
 	var fakeIpEnabled: Boolean by mutableStateOf(loadFakeIpEnabled())
 		private set
 
@@ -103,8 +100,6 @@ class SettingsViewModel(
 		}
 	}
 
-	private fun loadForegroundServiceEnabled(): Boolean = prefs.getBoolean("foreground_service_enabled", false)
-
 	private fun loadFakeIpEnabled(): Boolean = prefs.getBoolean("fake_ip", false)
 
 	private fun loadIpv6Enabled(): Boolean = prefs.getBoolean("ipv6", true)
@@ -143,11 +138,6 @@ class SettingsViewModel(
 	fun updateLanguagePreference(preference: LanguagePreference) {
 		languagePreference = preference
 		prefs.edit { putString("language", preference.name) }
-	}
-
-	fun updateForegroundServiceEnabled(enabled: Boolean) {
-		foregroundServiceEnabled = enabled
-		prefs.edit { putBoolean("foreground_service_enabled", enabled) }
 	}
 
 	fun updateFakeIpEnabled(enabled: Boolean) {

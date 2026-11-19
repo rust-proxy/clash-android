@@ -1,25 +1,25 @@
 package rs.clash.android
 
+import android.content.Context
 import android.util.Log
-import kotlinx.coroutines.flow.MutableStateFlow
-import uniffi.clash_android_ffi.ClashInstance
 import uniffi.clash_android_ffi.EyreException
 import uniffi.clash_android_ffi.formatEyreError
 import android.app.Application as AndroidApplication
 
 class Application : AndroidApplication() {
+	private external fun javaInit(context: Context)
+
 	override fun onCreate() {
 		super.onCreate()
 		// Setup uncaught exception handler
 		setupUncaughtExceptionHandler()
 		Global.application = this
+		System.loadLibrary("clash_android_ffi")
+		javaInit(this)
 	}
 }
 
 object Global {
-	var profilePath: String = ""
-	val isServiceRunning = MutableStateFlow(false)
-	var clashInstance: ClashInstance? = null
 	lateinit var application: Application
 }
 

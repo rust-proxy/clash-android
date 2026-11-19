@@ -30,6 +30,7 @@
             </intent-filter>
         </activity>
         <service android:name=".service.TunService"
+            android:process=":proxy"
             android:exported="true"
             android:foregroundServiceType="specialUse"
             android:permission="android.permission.BIND_VPN_SERVICE">

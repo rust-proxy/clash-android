@@ -50,11 +50,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.annotation.RootGraph
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
-import rs.clash.android.Global
 import rs.clash.android.R
 import rs.clash.android.model.ProfileType
 import rs.clash.android.ui.components.ActiveProfileCard
@@ -144,10 +144,8 @@ fun ProfileScreen(
 		val configuredProxyUrl = updateProxyUrl.value.trim().takeIf { it.isNotEmpty() }
 		val effectiveConfiguredProxyUrl =
 			configuredProxyUrl ?: profile.proxyUrl?.trim()?.takeIf { it.isNotEmpty() }
-		val clashProxyUrl =
-			Global.clashInstance?.mixedPort()?.let { port ->
-				"http://127.0.0.1:$port"
-			}
+		val session by vm.vpnSession.collectAsStateWithLifecycle()
+		val clashProxyUrl = session.localProxyUrl
 		AlertDialog(
 			onDismissRequest = {
 				if (!vm.isDownloading) {

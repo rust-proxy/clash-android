@@ -71,14 +71,19 @@ pub struct ProfileOverride {
 pub struct ClashInstance {
     mixed_port: u16,
     cancel_token: CancellationToken,
+    stopped: CancellationToken,
     _handle: Option<JoinHandle<eyre::Result<()>>>,
 }
 
-#[uniffi::export]
+#[uniffi::export(async_runtime = "tokio")]
 impl ClashInstance {
     /// The mixed HTTP/SOCKS port the proxy is listening on
     pub fn mixed_port(&self) -> u16 {
         self.mixed_port
+    }
+
+    pub async fn await_stopped(&self) {
+        self.stopped.cancelled().await;
     }
 
     /// Shut down clash-rs and cancel the background task
@@ -89,7 +94,7 @@ impl ClashInstance {
     }
 }
 
-#[unsafe(export_name = "Java_rs_clash_android_MainActivity_javaInit")]
+#[unsafe(export_name = "Java_rs_clash_android_Application_javaInit")]
 pub extern "system" fn java_init(
     mut env: jni::EnvUnowned,
     _class: jni::objects::JClass,
@@ -306,7 +311,10 @@ async fn run_clash(
 
     let cancel_token = CancellationToken::new();
     let token = cancel_token.clone();
+    let stopped = CancellationToken::new();
+    let completion = stopped.clone().drop_guard();
     let handle: JoinHandle<eyre::Result<()>> = tokio::spawn(async move {
+        let _completion = completion;
         let (log_tx, _) = tokio::sync::broadcast::channel(100);
         info!("Starting clash-rs");
         // Android owns config loading and applies TUN/DNS overrides above.
@@ -329,6 +337,7 @@ async fn run_clash(
     Ok(Arc::new(ClashInstance {
         mixed_port,
         cancel_token,
+        stopped,
         _handle: Some(handle),
     }))
 }

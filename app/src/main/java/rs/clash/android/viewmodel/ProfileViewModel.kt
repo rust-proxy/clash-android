@@ -18,6 +18,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import rs.clash.android.Global
 import rs.clash.android.R
+import rs.clash.android.data.AppData
 import rs.clash.android.model.Profile
 import rs.clash.android.model.ProfileType
 import rs.clash.android.ui.snackbar.SnackbarController
@@ -45,6 +46,14 @@ data class VerificationResult(
 class ProfileViewModel(
 	application: Application,
 ) : AndroidViewModel(application) {
+	companion object {
+		// Download jobs can outlive their screen. Accessed on the UI thread.
+		private var activeDownloads = 0
+		internal val hasActiveDownloads: Boolean get() = activeDownloads > 0
+	}
+
+	val vpnSession = AppData.vpn.session
+
 	private val prefs = Global.application.getSharedPreferences("file_prefs", Context.MODE_PRIVATE)
 	var selectedFile by mutableStateOf<FileInfo?>(null)
 		private set
@@ -187,8 +196,6 @@ class ProfileViewModel(
 				prefs.edit {
 					putString("profile_path", file.absolutePath)
 				}
-				// Immediately update Global.profilePath
-				Global.profilePath = file.absolutePath
 			}
 			
 			saveProfiles()
@@ -253,8 +260,6 @@ class ProfileViewModel(
 			prefs.edit {
 				putString("profile_path", profiles[index].filePath)
 			}
-			// Immediately update Global.profilePath
-			Global.profilePath = profiles[index].filePath
 			
 			saveProfiles()
 			SnackbarController.showMessage(
@@ -283,8 +288,6 @@ class ProfileViewModel(
 			prefs.edit {
 				remove("profile_path")
 			}
-			// Immediately clear Global.profilePath
-			Global.profilePath = ""
 		}
 		
 		saveProfiles()
@@ -348,6 +351,21 @@ class ProfileViewModel(
 	var downloadProgress by mutableStateOf<DownloadProgress?>(null)
 		private set
 
+	private fun launchDownload(download: suspend () -> Unit) {
+		viewModelScope.launch {
+			activeDownloads++
+			isDownloading = true
+			downloadProgress = null
+			try {
+				download()
+			} finally {
+				activeDownloads--
+				isDownloading = false
+				downloadProgress = null
+			}
+		}
+	}
+
 	fun addRemoteProfile(
 		context: Context,
 		profileName: String,
@@ -356,9 +374,7 @@ class ProfileViewModel(
 		userAgent: String? = null,
 		proxyUrl: String? = null,
 	) {
-		viewModelScope.launch {
-			isDownloading = true
-			downloadProgress = null
+		launchDownload {
 			try {
 				// Create unique file name based on profile name
 				val fileName = profileName.replace(Regex("[^a-zA-Z0-9\\u4e00-\\u9fa5_-]"), "_")
@@ -366,9 +382,7 @@ class ProfileViewModel(
 				
 				// Auto-detect proxy if VPN is running and user didn't specify one
 				val effectiveProxyUrl =
-					proxyUrl ?: Global.clashInstance?.mixedPort()?.let { port ->
-						"http://127.0.0.1:$port"
-					}
+					proxyUrl ?: vpnSession.value.localProxyUrl
 				
 				// Progress callback - update on main thread
 				val progressCallback =
@@ -440,8 +454,6 @@ class ProfileViewModel(
 							prefs.edit {
 								putString("profile_path", file.absolutePath)
 							}
-							// Immediately update Global.profilePath
-							Global.profilePath = file.absolutePath
 						}
 						
 						saveProfiles()
@@ -462,9 +474,6 @@ class ProfileViewModel(
 						e.message ?: e.toString(),
 					),
 				)
-			} finally {
-				isDownloading = false
-				downloadProgress = null
 			}
 		}
 	}
@@ -482,9 +491,7 @@ class ProfileViewModel(
 			return
 		}
 		
-		viewModelScope.launch {
-			isDownloading = true
-			downloadProgress = null
+		launchDownload {
 			try {
 				withContext(Dispatchers.IO) {
 					val file = File(profile.filePath)
@@ -498,9 +505,7 @@ class ProfileViewModel(
 					val effectiveProxyUrl =
 						proxyUrl
 							?: profile.proxyUrl
-							?: Global.clashInstance?.mixedPort()?.let { port ->
-								"http://127.0.0.1:$port"
-							}
+							?: vpnSession.value.localProxyUrl
 					
 					// Progress callback - update on main thread
 					val progressCallback =
@@ -616,9 +621,6 @@ class ProfileViewModel(
 						e.message ?: e.toString(),
 					),
 				)
-			} finally {
-				isDownloading = false
-				downloadProgress = null
 			}
 		}
 	}

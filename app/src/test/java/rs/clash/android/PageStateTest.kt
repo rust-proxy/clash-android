@@ -34,6 +34,7 @@ import rs.clash.android.data.OverviewRepository
 import rs.clash.android.data.ProxyInfo
 import rs.clash.android.data.ProxyRepository
 import rs.clash.android.service.VpnController
+import rs.clash.android.service.VpnSessionState
 import rs.clash.android.service.VpnStartResult
 import rs.clash.android.viewmodel.ConnectionsUiState
 import rs.clash.android.viewmodel.ConnectionsViewModel
@@ -65,13 +66,42 @@ class PageStateTest {
 
 	private fun panel(
 		repository: ProxyRepository,
-		running: MutableStateFlow<Boolean> = MutableStateFlow(true),
-	): PanelViewModel = PanelViewModel(repository, running).also { viewModels.put("panel-${panelCount++}", it) }
+		vpn: FakeVpn = FakeVpn(running = true),
+	): PanelViewModel = PanelViewModel(repository, vpn).also { viewModels.put("panel-${panelCount++}", it) }
 
 	private fun home(
 		repository: OverviewRepository,
-		vpn: FakeVpn = FakeVpn().apply { running.value = true },
+		vpn: FakeVpn = FakeVpn(running = true),
 	): HomeViewModel = HomeViewModel(repository, vpn).also { viewModels.put("home", it) }
+
+	@Test
+	fun announcingMixedPortPreservesTheInFlightOverviewRequest() =
+		runTest {
+			val vpn = FakeVpn(running = true)
+			val response = CompletableDeferred<Overview>()
+			var requests = 0
+			val home =
+				home(
+					object : OverviewRepository {
+						override suspend fun getOverview(): Overview {
+							requests++
+							return response.await()
+						}
+					},
+					vpn,
+				)
+			val observing = backgroundScope.launch { home.observe() }
+			advanceTimeBy(1000)
+			runCurrent()
+			assertEquals(1, requests)
+			vpn.session.value = VpnSessionState(running = true, mixedPort = 17890)
+			runCurrent()
+			response.complete(Overview(connectionCount = 7))
+			runCurrent()
+			assertEquals(7, home.uiState.value.overview.connectionCount)
+			assertEquals(1, requests)
+			observing.cancelAndJoin()
+		}
 
 	@Test
 	fun returningHomePreservesOverviewAndRefreshesImmediatelyWithoutHiddenPolling() =
@@ -152,7 +182,7 @@ class PageStateTest {
 	@Test
 	fun hiddenHomeInvalidatesOverviewAcrossVpnSessions() =
 		runTest {
-			val vpn = FakeVpn().apply { running.value = true }
+			val vpn = FakeVpn(running = true)
 			var calls = 0
 			val home =
 				home(
@@ -166,10 +196,10 @@ class PageStateTest {
 			runCurrent()
 			assertEquals(1, home.uiState.value.overview.connectionCount)
 			first.cancelAndJoin()
-			vpn.running.value = false
+			vpn.session.value = VpnSessionState(running = false)
 			runCurrent()
 			assertEquals(HomeUiState(), home.uiState.value)
-			vpn.running.value = true
+			vpn.session.value = VpnSessionState(running = true)
 			runCurrent()
 			assertEquals(HomeUiState(isVpnRunning = true), home.uiState.value)
 			assertEquals(1, calls)
@@ -308,9 +338,9 @@ class PageStateTest {
 	@Test
 	fun stoppingVpnWhilePanelIsHiddenInvalidatesCacheWithoutFetching() =
 		runTest {
-			val running = MutableStateFlow(true)
+			val vpn = FakeVpn(running = true)
 			val repository = FakeProxies()
-			val panel = panel(repository, running)
+			val panel = panel(repository, vpn)
 			val first = backgroundScope.launch { panel.observe() }
 			runCurrent()
 			assertTrue(
@@ -318,10 +348,10 @@ class PageStateTest {
 					.isNotEmpty(),
 			)
 			first.cancelAndJoin()
-			running.value = false
+			vpn.session.value = VpnSessionState(running = false)
 			runCurrent()
 			assertEquals(PanelUiState(), panel.uiState.value)
-			running.value = true
+			vpn.session.value = VpnSessionState(running = true)
 			runCurrent()
 			assertTrue(
 				panel.uiState.value.proxies
@@ -399,7 +429,7 @@ class PageStateTest {
 							return ConnectionsResponse(100, 200, emptyList())
 						}
 					}
-				val connections = ConnectionsViewModel(repository, MutableStateFlow(true))
+				val connections = ConnectionsViewModel(repository, FakeVpn(running = true))
 				val observing = launch { connections.observe() }
 				try {
 					started.await()
@@ -476,7 +506,6 @@ class PageStateTest {
 			assertEquals(HomeEffect.Message(R.string.home_select_profile_first), home.effects.first())
 			home.onAction(HomeAction.StopVpn)
 			assertEquals(1, vpn.stops)
-			assertEquals(HomeEffect.RestartApp, home.effects.first())
 		}
 
 	@Test
@@ -493,12 +522,12 @@ class PageStateTest {
 							return Overview(connectionCount = 99)
 						}
 					}
-				val vpn = FakeVpn().apply { running.value = true }
+				val vpn = FakeVpn(running = true)
 				val home = home(repository, vpn)
 				val observing = launch { home.observe() }
 				try {
 					started.await()
-					vpn.running.value = false
+					vpn.session.value = VpnSessionState(running = false)
 					yield()
 					release.complete(Unit)
 					home.uiState.first { !it.isVpnRunning }
@@ -514,7 +543,7 @@ class PageStateTest {
 	fun delayTestsUseLeavesDeduplicateAndStopWithTheService() =
 		runBlocking {
 			withTimeout(5000) {
-				val running = MutableStateFlow(true)
+				val vpn = FakeVpn(running = true)
 				val requested = Channel<String>(Channel.UNLIMITED)
 				val cancellation = CompletableDeferred<Unit>()
 				var cancelled = false
@@ -530,7 +559,7 @@ class PageStateTest {
 							}
 						}
 					}
-				val panel = panel(repository, running)
+				val panel = panel(repository, vpn)
 				val observing = launch { panel.observe() }
 				try {
 					panel.uiState.first { it.proxies.isNotEmpty() }
@@ -540,7 +569,7 @@ class PageStateTest {
 					repeat(5) { yield() }
 					assertTrue(requested.tryReceive().isFailure)
 					assertEquals(ProxyDelay.Testing, panel.uiState.value.delays["leaf"])
-					running.value = false
+					vpn.session.value = VpnSessionState(running = false)
 					cancellation.await()
 					panel.uiState.first { it == PanelUiState() }
 					assertTrue(cancelled)
@@ -620,11 +649,17 @@ class PageStateTest {
 		}
 }
 
-private class FakeVpn : VpnController {
-	override val running = MutableStateFlow(false)
+private class FakeVpn(
+	running: Boolean = false,
+) : VpnController {
+	override val session = MutableStateFlow(VpnSessionState(running))
 	var starts = 0
 	var stops = 0
 	var result: VpnStartResult = VpnStartResult.Started
+
+	override fun attach() = Unit
+
+	override fun detach() = Unit
 
 	override fun start(): VpnStartResult {
 		starts++
@@ -633,7 +668,7 @@ private class FakeVpn : VpnController {
 
 	override fun stop() {
 		stops++
-		running.value = false
+		session.value = VpnSessionState()
 	}
 }
 

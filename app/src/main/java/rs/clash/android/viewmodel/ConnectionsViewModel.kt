@@ -5,13 +5,13 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
-import rs.clash.android.Global
 import rs.clash.android.data.AppData
 import rs.clash.android.data.ConnectionsRepository
+import rs.clash.android.service.VpnController
+import rs.clash.android.service.runningChanges
 import uniffi.clash_android_ffi.Connection
 
 data class ConnectionsUiState(
@@ -24,7 +24,7 @@ data class ConnectionsUiState(
 
 class ConnectionsViewModel(
 	private val repository: ConnectionsRepository = AppData.core,
-	private val running: StateFlow<Boolean> = Global.isServiceRunning,
+	private val vpn: VpnController = AppData.vpn,
 ) : ViewModel() {
 	private val state = MutableStateFlow(ConnectionsUiState())
 	val uiState = state.asStateFlow()
@@ -32,10 +32,11 @@ class ConnectionsViewModel(
 	/** The destination lifecycle owns polling and cancels in-flight requests when hidden. */
 	suspend fun observe() {
 		try {
-			running.collectLatest { enabled ->
-				state.value = ConnectionsUiState()
-				if (enabled) pollWhileServiceRunning(running, 2000, refresh = ::fetchConnections)
-			}
+			pollWhileServiceRunning(
+				vpn.runningChanges.onEach { state.value = ConnectionsUiState() },
+				intervalMillis = 2000,
+				refresh = ::fetchConnections,
+			)
 		} finally {
 			// A retained navigation entry should not retain the entire connection snapshot.
 			state.value = ConnectionsUiState()
@@ -47,7 +48,7 @@ class ConnectionsViewModel(
 		try {
 			val response = repository.getConnections()
 			currentCoroutineContext().ensureActive()
-			if (!running.value) return
+			if (!vpn.session.value.running) return
 			state.value =
 				ConnectionsUiState(
 					connections = response.connections,
@@ -58,7 +59,7 @@ class ConnectionsViewModel(
 			throw e
 		} catch (e: Exception) {
 			currentCoroutineContext().ensureActive()
-			if (!running.value) return
+			if (!vpn.session.value.running) return
 			state.update { it.copy(connections = emptyList(), errorMessage = e.message ?: e.toString()) }
 		} finally {
 			state.update { it.copy(isRefreshing = false) }
