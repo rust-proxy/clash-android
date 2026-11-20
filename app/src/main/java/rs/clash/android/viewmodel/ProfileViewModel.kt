@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -25,8 +26,10 @@ import rs.clash.android.ui.snackbar.SnackbarController
 import uniffi.clash_android_ffi.DownloadProgress
 import uniffi.clash_android_ffi.DownloadProgressCallback
 import uniffi.clash_android_ffi.EyreException
+import uniffi.clash_android_ffi.SubscriptionUpdate
 import uniffi.clash_android_ffi.downloadFileWithProgress
 import uniffi.clash_android_ffi.formatEyreError
+import uniffi.clash_android_ffi.updateSubscription
 import uniffi.clash_android_ffi.verifyConfig
 import java.io.File
 import java.io.FileOutputStream
@@ -537,12 +540,6 @@ class ProfileViewModel(
 		launchDownload {
 			try {
 				withContext(Dispatchers.IO) {
-					val file = File(profile.filePath)
-					// Download to a scratch file and only replace the profile once the
-					// payload was fetched *and* validated. Downloading straight onto
-					// `file` used to destroy the last working configuration whenever the
-					// update failed halfway through or the new config was rejected.
-					val tempFile = File(file.parentFile, "${file.name}.download")
 					// Use provided parameters or fall back to profile's stored values
 					val effectiveUserAgent = userAgent ?: profile.userAgent
 					val effectiveProxyUrl =
@@ -561,84 +558,31 @@ class ProfileViewModel(
 						}
 					
 					val result =
-						try {
-							downloadFileWithProgress(
-								profile.url,
-								tempFile.absolutePath,
-								effectiveUserAgent,
-								effectiveProxyUrl,
-								progressCallback,
-							)
-						} catch (e: EyreException) {
-							tempFile.delete()
-							SnackbarController.showMessage(
-								getApplication<Application>()
-									.getString(R.string.profile_remote_update_failed, formatEyreError(e)),
-							)
-							return@withContext
-						} catch (e: Exception) {
-							tempFile.delete()
-							SnackbarController.showMessage(
-								getApplication<Application>().getString(
-									R.string.profile_remote_update_failed,
-									e.message ?: e.toString(),
-								),
-							)
-							return@withContext
+						updateSubscription(
+							profile.url,
+							profile.filePath,
+							effectiveUserAgent,
+							effectiveProxyUrl,
+							progressCallback,
+						)
+					val fileSize =
+						when (result) {
+							is SubscriptionUpdate.Updated -> result.fileSize.toLong()
+							is SubscriptionUpdate.InvalidConfig -> {
+								SnackbarController.showMessage(
+									getApplication<Application>().getString(R.string.profile_remote_verify_failed, result.detail),
+								)
+								return@withContext
+							}
 						}
-					
-					if (!result.success) {
-						tempFile.delete()
-						SnackbarController.showMessage(
-							getApplication<Application>().getString(
-								R.string.profile_remote_update_failed,
-								result.errorMessage
-									?: getApplication<Application>().getString(R.string.profile_unknown_error),
-							),
-						)
-						return@withContext
-					}
-					
-					// Verify the downloaded config before it replaces the current one
-					val (isValid, error) = verify(tempFile.absolutePath)
-					if (!isValid) {
-						tempFile.delete()
-						SnackbarController.showMessage(
-							getApplication<Application>()
-								.getString(R.string.profile_remote_verify_failed, error),
-						)
-						return@withContext
-					}
-					
-					// Promote the verified download to the real profile file.
-					if (file.exists() && !file.delete()) {
-						tempFile.delete()
-						SnackbarController.showMessage(
-							getApplication<Application>().getString(
-								R.string.profile_remote_update_failed,
-								"cannot replace ${file.name}",
-							),
-						)
-						return@withContext
-					}
-					if (!tempFile.renameTo(file)) {
-						tempFile.delete()
-						SnackbarController.showMessage(
-							getApplication<Application>().getString(
-								R.string.profile_remote_update_failed,
-								"cannot write ${file.name}",
-							),
-						)
-						return@withContext
-					}
-					
+
 					withContext(Dispatchers.Main) {
 						// Update profile
 						val index = profiles.indexOfFirst { it.id == profile.id }
 						if (index >= 0) {
 							profiles[index] =
 								profiles[index].copy(
-									fileSize = result.fileSize.toLong(),
+									fileSize = fileSize,
 									lastUpdated = System.currentTimeMillis(),
 								)
 							if (profiles[index].isActive) {
@@ -657,6 +601,8 @@ class ProfileViewModel(
 					getApplication<Application>()
 						.getString(R.string.profile_remote_update_failed, formatEyreError(e)),
 				)
+			} catch (e: CancellationException) {
+				throw e
 			} catch (e: Exception) {
 				SnackbarController.showMessage(
 					getApplication<Application>().getString(

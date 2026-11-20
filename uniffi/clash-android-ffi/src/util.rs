@@ -1,7 +1,10 @@
+use std::path::Path;
+
 use eyre::Context;
+use tempfile::{NamedTempFile, TempPath};
 use tokio::io::AsyncWriteExt;
 use tokio_stream::StreamExt;
-use tracing::{error, info};
+use tracing::info;
 
 use crate::EyreError;
 
@@ -41,10 +44,87 @@ pub async fn download_file_with_progress(
     proxy_url: Option<String>,
     progress_callback: Option<Box<dyn DownloadProgressCallback>>,
 ) -> Result<DownloadResult, EyreError> {
-    info!("Starting download from: {}", url);
+    let response = fetch(&url, user_agent, proxy_url).await?;
+    if let Some(message) = http_error(&response) {
+        return Ok(DownloadResult {
+            success: false,
+            file_size: 0,
+            error_message: Some(message),
+        });
+    }
+    let destination = Path::new(&output_path);
+    let (staged, file_size) = stage_download(response, destination, progress_callback).await?;
+    staged
+        .persist(destination)
+        .map_err(std::io::Error::from)
+        .wrap_err("Failed to install download")?;
+    Ok(DownloadResult {
+        success: true,
+        file_size,
+        error_message: None,
+    })
+}
 
+#[derive(uniffi::Enum)]
+pub enum SubscriptionUpdate {
+    Updated { file_size: u64 },
+    InvalidConfig { detail: String },
+}
+
+#[uniffi::export(async_runtime = "tokio")]
+pub async fn update_subscription(
+    url: String,
+    output_path: String,
+    user_agent: Option<String>,
+    proxy_url: Option<String>,
+    progress_callback: Option<Box<dyn DownloadProgressCallback>>,
+) -> Result<SubscriptionUpdate, EyreError> {
+    let response = fetch(&url, user_agent, proxy_url).await?;
+    install_subscription(response, Path::new(&output_path), progress_callback).await
+}
+
+async fn install_subscription(
+    response: reqwest::Response,
+    destination: &Path,
+    progress_callback: Option<Box<dyn DownloadProgressCallback>>,
+) -> Result<SubscriptionUpdate, EyreError> {
+    if let Some(message) = http_error(&response) {
+        eyre::bail!(message);
+    }
+    let (staged, file_size) = stage_download(response, destination, progress_callback).await?;
+    let path = staged
+        .to_str()
+        .ok_or_else(|| eyre::eyre!("Invalid subscription path"))?;
+    if let Err(error) = crate::verify_config(path) {
+        return Ok(SubscriptionUpdate::InvalidConfig {
+            detail: error.to_string(),
+        });
+    }
+    // Drop the failed TempPath here instead of retaining it in a Kotlin exception.
+    staged
+        .persist(destination)
+        .map_err(std::io::Error::from)
+        .wrap_err("Failed to replace subscription")?;
+    Ok(SubscriptionUpdate::Updated { file_size })
+}
+
+fn http_error(response: &reqwest::Response) -> Option<String> {
+    let status = response.status();
+    (!status.is_success()).then(|| {
+        format!(
+            "HTTP {} - {}",
+            status.as_u16(),
+            status.canonical_reason().unwrap_or("Unknown")
+        )
+    })
+}
+
+async fn fetch(
+    url: &str,
+    user_agent: Option<String>,
+    proxy_url: Option<String>,
+) -> Result<reqwest::Response, EyreError> {
     let ua = user_agent.unwrap_or_else(|| "clash-android/1.0".to_string());
-    info!("Using User-Agent: {}", ua);
 
     // Build reqwest client. Its `rustls` feature verifies certificates with
     // `rustls-platform-verifier`, i.e. the OS trust store (the Android verifier
@@ -55,9 +135,8 @@ pub async fn download_file_with_progress(
 
     // Add proxy if provided
     if let Some(proxy) = proxy_url {
-        info!("Using proxy: {}", proxy);
         let proxy =
-            reqwest::Proxy::all(&proxy).map_err(|e| eyre::eyre!("Invalid proxy URL: {}", e))?;
+            reqwest::Proxy::all(proxy).map_err(|e| eyre::eyre!("Invalid proxy URL: {}", e))?;
         client_builder = client_builder.proxy(proxy);
     }
 
@@ -65,31 +144,18 @@ pub async fn download_file_with_progress(
         .build()
         .map_err(|e| eyre::eyre!("Failed to build HTTP client: {}", e))?;
 
-    // Send request
-    info!("Sending request to: {}", url);
-    let response = client
-        .get(&url)
+    client
+        .get(url)
         .send()
         .await
-        .map_err(|e| eyre::eyre!("Failed to send request: {}", e))?;
+        .wrap_err("Failed to send download request")
+}
 
-    let status = response.status();
-    if !status.is_success() {
-        error!(
-            "HTTP request failed with status: {} for URL: {}",
-            status, url
-        );
-        return Ok(DownloadResult {
-            success: false,
-            file_size: 0,
-            error_message: Some(format!(
-                "HTTP {} - {}",
-                status.as_u16(),
-                status.canonical_reason().unwrap_or("Unknown")
-            )),
-        });
-    }
-
+async fn stage_download(
+    response: reqwest::Response,
+    destination: &Path,
+    progress_callback: Option<Box<dyn DownloadProgressCallback>>,
+) -> Result<(TempPath, u64), EyreError> {
     // Get content length
     let total_size = response.content_length().unwrap_or(0);
     info!("Content length: {} bytes", total_size);
@@ -103,51 +169,21 @@ pub async fn download_file_with_progress(
         });
     }
 
-    // Stream the body straight into a temporary file next to the destination
-    // instead of accumulating it in memory: a config can be several megabytes
-    // and buffering it whole can OOM an Android process. The temporary file is
-    // only renamed over `output_path` once every chunk arrived, so a failed or
-    // truncated download cannot clobber a config that is still in use.
-    let destination = std::path::Path::new(&output_path);
-    let temp_path = match destination.file_name() {
-        Some(name) => {
-            let mut temp_name = std::ffi::OsString::from(".");
-            temp_name.push(name);
-            temp_name.push(format!(".{}.part", std::process::id()));
-            destination.with_file_name(temp_name)
-        }
-        None => {
-            return Ok(DownloadResult {
-                success: false,
-                file_size: 0,
-                error_message: Some(format!("Invalid output path: {output_path}")),
-            });
-        }
-    };
-
-    let mut file = tokio::fs::File::create(&temp_path)
-        .await
-        .context(format!("Failed to create file: {}", temp_path.display()))?;
-
-    // Download with progress tracking
+    let parent = destination
+        .parent()
+        .ok_or_else(|| eyre::eyre!("Invalid output path"))?;
+    let (file, staged) = NamedTempFile::new_in(parent)
+        .wrap_err("Failed to create temporary download")?
+        .into_parts();
+    let mut file = tokio::fs::File::from_std(file);
     let mut stream = response.bytes_stream();
-    let mut downloaded: u64 = 0;
-
+    let mut downloaded = 0;
     while let Some(chunk) = stream.next().await {
-        let chunk = match chunk {
-            Ok(chunk) => chunk,
-            Err(e) => {
-                drop(file);
-                _ = tokio::fs::remove_file(&temp_path).await;
-                return Err(eyre::eyre!("Failed to read chunk: {}", e));
-            }
-        };
+        let chunk = chunk.wrap_err("Failed to read download")?;
         file.write_all(&chunk)
             .await
-            .context(format!("Failed to write to file: {}", temp_path.display()))?;
+            .wrap_err("Failed to write download")?;
         downloaded += chunk.len() as u64;
-
-        // Report progress
         if let Some(ref callback) = progress_callback {
             callback.on_progress(DownloadProgress {
                 downloaded,
@@ -155,34 +191,8 @@ pub async fn download_file_with_progress(
             });
         }
     }
-
-    file.flush()
-        .await
-        .context(format!("Failed to flush file: {}", temp_path.display()))?;
-    file.sync_all()
-        .await
-        .context(format!("Failed to sync file: {}", temp_path.display()))?;
+    file.flush().await.wrap_err("Failed to flush download")?;
+    file.sync_all().await.wrap_err("Failed to sync download")?;
     drop(file);
-
-    if let Err(e) = tokio::fs::rename(&temp_path, destination).await {
-        _ = tokio::fs::remove_file(&temp_path).await;
-        return Err(eyre::eyre!(
-            "Failed to move {} to {}: {}",
-            temp_path.display(),
-            output_path,
-            e
-        ));
-    }
-
-    let file_size = downloaded;
-    info!(
-        "Download completed: {} bytes written to {}",
-        file_size, output_path
-    );
-
-    Ok(DownloadResult {
-        success: true,
-        file_size,
-        error_message: None,
-    })
+    Ok((staged, downloaded))
 }
