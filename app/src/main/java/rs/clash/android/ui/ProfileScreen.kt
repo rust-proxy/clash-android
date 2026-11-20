@@ -163,8 +163,8 @@ fun ProfileScreen(
 	// Info dialog
 	if (showInfoDialog) {
 		TextInfoDialog(
-			title = stringResource(R.string.about_title),
-			content = stringResource(R.string.known_issues_profile),
+			title = stringResource(R.string.profile_compatibility_title),
+			content = stringResource(R.string.profile_compatibility_note),
 			onDismiss = { showInfoDialog = false },
 		)
 	}
@@ -529,7 +529,7 @@ fun ProfileScreen(
 					IconButton(onClick = { showInfoDialog = true }) {
 						Icon(
 							imageVector = Icons.Filled.Info,
-							contentDescription = stringResource(R.string.action_about),
+							contentDescription = stringResource(R.string.profile_compatibility_title),
 						)
 					}
 				},

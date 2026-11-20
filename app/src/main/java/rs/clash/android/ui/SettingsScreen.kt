@@ -34,7 +34,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -71,7 +70,6 @@ import rs.clash.android.model.MAX_UI_SCALE
 import rs.clash.android.model.MIN_UI_SCALE
 import rs.clash.android.model.UI_SCALE_STEP
 import rs.clash.android.model.UiScale
-import rs.clash.android.ui.components.TextInfoDialog
 import rs.clash.android.util.PermissionHelper
 import rs.clash.android.viewmodel.AppFilterMode
 import rs.clash.android.viewmodel.DarkModePreference
@@ -119,16 +117,6 @@ fun SettingsScreen(
 		) { isGranted ->
 			hasNotificationPermission = isGranted
 		}
-	var showInfoDialog by remember { mutableStateOf(false) }
-
-	// Info dialog
-	if (showInfoDialog) {
-		TextInfoDialog(
-			title = stringResource(R.string.about_title),
-			content = stringResource(R.string.known_issues_settings),
-			onDismiss = { showInfoDialog = false },
-		)
-	}
 
 	Scaffold(
 		modifier = modifier,
@@ -138,14 +126,6 @@ fun SettingsScreen(
 					Text(stringResource(R.string.settings_title))
 				},
 				windowInsets = WindowInsets(),
-				actions = {
-					IconButton(onClick = { showInfoDialog = true }) {
-						Icon(
-							imageVector = Icons.Filled.Info,
-							contentDescription = stringResource(R.string.action_about),
-						)
-					}
-				},
 			)
 		},
 	) { padding ->

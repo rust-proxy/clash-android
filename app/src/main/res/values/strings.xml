@@ -106,7 +106,6 @@
     <string name="cancel">取消</string>
 
     <!-- About Screen -->
-    <string name="about_title">关于</string>
     <string name="about_app_name">Clash Android</string>
     <string name="about_version">版本</string>
     <string name="about_description">基于 Clash 的 Android VPN 客户端</string>
@@ -115,7 +114,6 @@
     <string name="about_license">开源许可</string>
     
     <!-- TopBar Actions -->
-    <string name="action_about">关于</string>
     <string name="action_more">更多选项</string>
     <string name="action_exit_ui_keep_vpn">退出界面，保持 VPN 运行</string>
     <string name="exit_ui_profile_busy">配置下载或更新中，请在完成后退出界面。</string>
@@ -175,11 +173,8 @@
     <string name="profile_verify_valid">配置文件合法\n\n%1$s</string>
     <string name="profile_active_config">当前活动配置</string>
 
-    <!-- Known issues -->
-    <string name="known_issues_title">已知问题</string>
-    <string name="known_issues_home">VPN 在独立进程中运行。重新打开应用即可管理当前连接。</string>
-    <string name="known_issues_profile">- 目前 clash-rs 并非100%兼容 mihomo 的配置文件, 应用配置文件前可先检验配置文件合法性。\n- VPN 运行时切换配置会自动重连，现有连接会中断。</string>
-    <string name="known_issues_settings">- VPN 运行时，更改 Fake IP、IPv6 或保存新的应用过滤规则会自动重连。</string>
+    <string name="profile_compatibility_title">配置兼容性</string>
+    <string name="profile_compatibility_note">clash-rs 对部分 mihomo 配置项的支持有限。使用 mihomo 配置时，建议先验证配置。</string>
     <string name="lan_send">分享</string>
     <string name="lan_receive">从 LocalSend 接收</string>
     <string name="lan_waiting">请在另一台设备的 LocalSend 中选择本机。</string>

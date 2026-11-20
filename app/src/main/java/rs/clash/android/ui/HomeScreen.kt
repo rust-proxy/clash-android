@@ -17,7 +17,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
@@ -56,7 +55,6 @@ import rs.clash.android.R
 import rs.clash.android.data.MemoryUsage
 import rs.clash.android.formatSize
 import rs.clash.android.ui.components.RuntimeCard
-import rs.clash.android.ui.components.TextInfoDialog
 import rs.clash.android.ui.components.TrafficCard
 import rs.clash.android.ui.components.VpnStatusCard
 import rs.clash.android.ui.snackbar.SnackbarController.Companion.showMessage
@@ -77,7 +75,6 @@ fun HomeScreen(
 	val activity = LocalActivity.current as? MainActivity
 	var showActions by remember { mutableStateOf(false) }
 	var showRestartDialog by remember { mutableStateOf(false) }
-	var showInfoDialog by remember { mutableStateOf(false) }
 
 	val vpnPermissionLauncher =
 		rememberLauncherForActivityResult(
@@ -133,27 +130,12 @@ fun HomeScreen(
 		)
 	}
 
-	// Info dialog
-	if (showInfoDialog) {
-		TextInfoDialog(
-			title = stringResource(R.string.about_title),
-			content = stringResource(R.string.known_issues_home),
-			onDismiss = { showInfoDialog = false },
-		)
-	}
-
 	Scaffold(
 		modifier = modifier.fillMaxSize(),
 		topBar = {
 			TopAppBar(
 				title = { Text(stringResource(R.string.home_title)) },
 				actions = {
-					IconButton(onClick = { showInfoDialog = true }) {
-						Icon(
-							imageVector = Icons.Filled.Info,
-							contentDescription = stringResource(R.string.action_about),
-						)
-					}
 					Box {
 						IconButton(onClick = { showActions = true }) {
 							Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.action_more))

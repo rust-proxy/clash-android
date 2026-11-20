@@ -107,7 +107,6 @@
     <string name="cancel">Cancel</string>
 
     <!-- About Screen -->
-    <string name="about_title">About</string>
     <string name="about_app_name">Clash Android</string>
     <string name="about_version">Version</string>
     <string name="about_description">Clash based Android VPN client</string>
@@ -116,7 +115,6 @@
     <string name="about_license">Open Source License</string>
     
     <!-- TopBar Actions -->
-    <string name="action_about">About</string>
     <string name="action_more">More options</string>
     <string name="action_exit_ui_keep_vpn">Exit interface, keep VPN running</string>
     <string name="exit_ui_profile_busy">A profile is downloading or updating. You can exit when it finishes.</string>
@@ -176,11 +174,8 @@
     <string name="profile_verify_btn">Verify Configuration</string>
     <string name="profile_active_config">Current Active Profile</string>
 
-    <!-- Known issues -->
-    <string name="known_issues_title">Known Issues</string>
-    <string name="known_issues_home">The VPN runs in a separate process. You can reopen the app to manage the active connection.</string>
-    <string name="known_issues_profile">- clash-rs is not yet 100% compatible with mihomo configuration files, so you can verify a configuration file before applying it.\n- Switching profiles while the VPN is running reconnects it and closes existing connections.</string>
-    <string name="known_issues_settings">- Changing Fake IP or IPv6, or saving new app filter rules, reconnects a running VPN.</string>
+    <string name="profile_compatibility_title">Profile compatibility</string>
+    <string name="profile_compatibility_note">Some mihomo options have limited support in clash-rs. Verify your mihomo profile before using it.</string>
     <string name="lan_send">Share</string>
     <string name="lan_receive">Receive via LocalSend</string>
     <string name="lan_waiting">Select this device in LocalSend on the other device.</string>
