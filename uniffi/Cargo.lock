@@ -187,7 +187,7 @@ version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40c48f72fd53cd289104fc64099abca73db4166ad86ea0b4341abe65af83dadc"
 dependencies = [
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -198,7 +198,7 @@ checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
 dependencies = [
  "anstyle",
  "once_cell_polyfill",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1025,13 +1025,13 @@ dependencies = [
  "uniffi",
  "url",
  "urlencoding",
- "webpki-roots 1.0.11",
+ "webpki-roots 1.0.12",
 ]
 
 [[package]]
 name = "clash-lib"
-version = "0.10.11"
-source = "git+https://github.com/Watfaq/clash-rs.git?branch=master#f10e4eb7f081cd54c20f14f89382e4c315e3fe72"
+version = "0.10.12"
+source = "git+https://github.com/Watfaq/clash-rs.git?branch=master#2f62452678211746348b97e72fee0e78b8dc1b40"
 dependencies = [
  "aead 0.5.2",
  "aes 0.9.4",
@@ -1137,7 +1137,7 @@ dependencies = [
  "uuid",
  "watfaq-dns",
  "watfaq-netstack",
- "webpki-roots 1.0.11",
+ "webpki-roots 1.0.12",
  "wind-core",
  "wind-quic",
  "wind-tuic",
@@ -1806,7 +1806,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2122,7 +2122,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3040,7 +3040,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tower-service",
- "webpki-roots 1.0.11",
+ "webpki-roots 1.0.12",
 ]
 
 [[package]]
@@ -3107,7 +3107,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.61.2",
+ "windows-core 0.62.2",
 ]
 
 [[package]]
@@ -4300,7 +4300,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5198,7 +5198,7 @@ dependencies = [
 [[package]]
 name = "quinn"
 version = "0.12.0"
-source = "git+https://github.com/Tipuch/quinn.git?branch=bbrv3#01b8848dcb321eb17ad4d88dd6f84f28f45a0d6a"
+source = "git+https://github.com/Tipuch/quinn.git?branch=bbrv3#0ebaf7e2c9932e432ef5e7caf916291b02d8277e"
 dependencies = [
  "bytes",
  "cfg_aliases",
@@ -5217,7 +5217,7 @@ dependencies = [
 [[package]]
 name = "quinn-congestions"
 version = "0.1.0"
-source = "git+https://github.com/proxy-rs/quinn-congestions.git#83052f7da6f59d70792f9abb7b62b171cdc0d443"
+source = "git+https://github.com/proxy-rs/quinn-congestions.git#14757896e9b46883de0f17cef3d65008939f0159"
 dependencies = [
  "quinn 0.12.0",
  "quinn-proto 0.12.0",
@@ -5271,7 +5271,7 @@ dependencies = [
 [[package]]
 name = "quinn-proto"
 version = "0.12.0"
-source = "git+https://github.com/Tipuch/quinn.git?branch=bbrv3#01b8848dcb321eb17ad4d88dd6f84f28f45a0d6a"
+source = "git+https://github.com/Tipuch/quinn.git?branch=bbrv3#0ebaf7e2c9932e432ef5e7caf916291b02d8277e"
 dependencies = [
  "aws-lc-rs",
  "bytes",
@@ -5325,19 +5325,19 @@ dependencies = [
  "once_cell",
  "socket2 0.6.5",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
 name = "quinn-udp"
 version = "0.6.3"
-source = "git+https://github.com/Tipuch/quinn.git?branch=bbrv3#01b8848dcb321eb17ad4d88dd6f84f28f45a0d6a"
+source = "git+https://github.com/Tipuch/quinn.git?branch=bbrv3#0ebaf7e2c9932e432ef5e7caf916291b02d8277e"
 dependencies = [
  "cfg_aliases",
  "libc",
  "socket2 0.6.5",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5350,7 +5350,7 @@ dependencies = [
  "libc",
  "socket2 0.6.5",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5870,7 +5870,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5953,7 +5953,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6435,7 +6435,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
- "webpki-roots 1.0.11",
+ "webpki-roots 1.0.12",
  "windows 0.62.2",
  "yaml-rust2",
 ]
@@ -6728,7 +6728,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3d1e2c7f27f8d4cb10542a02c49005dbd6e93095799d6f3be745fae9f8fedd4"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6899,7 +6899,7 @@ dependencies = [
  "cfg-if 1.0.5",
  "libc",
  "psm",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7081,10 +7081,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -8103,7 +8103,7 @@ dependencies = [
  "tokio-rustls",
  "tracing",
  "url",
- "webpki-roots 1.0.11",
+ "webpki-roots 1.0.12",
 ]
 
 [[package]]
@@ -8671,8 +8671,8 @@ dependencies = [
 
 [[package]]
 name = "watfaq-dns"
-version = "0.10.11"
-source = "git+https://github.com/Watfaq/clash-rs.git?branch=master#f10e4eb7f081cd54c20f14f89382e4c315e3fe72"
+version = "0.10.12"
+source = "git+https://github.com/Watfaq/clash-rs.git?branch=master#2f62452678211746348b97e72fee0e78b8dc1b40"
 dependencies = [
  "async-trait",
  "futures",
@@ -8685,13 +8685,13 @@ dependencies = [
  "thiserror 2.0.21",
  "tokio",
  "tracing",
- "webpki-roots 1.0.11",
+ "webpki-roots 1.0.12",
 ]
 
 [[package]]
 name = "watfaq-netstack"
-version = "0.1.3"
-source = "git+https://github.com/Watfaq/clash-rs.git?branch=master#f10e4eb7f081cd54c20f14f89382e4c315e3fe72"
+version = "0.1.4"
+source = "git+https://github.com/Watfaq/clash-rs.git?branch=master#2f62452678211746348b97e72fee0e78b8dc1b40"
 dependencies = [
  "bytes",
  "etherparse 0.21.0",
@@ -8737,14 +8737,14 @@ version = "0.26.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "521bc38abb08001b01866da9f51eb7c5d647a19260e00054a8c7fd5f9e57f7a9"
 dependencies = [
- "webpki-roots 1.0.11",
+ "webpki-roots 1.0.12",
 ]
 
 [[package]]
 name = "webpki-roots"
-version = "1.0.11"
+version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5f280bbb2b287bc8e7de7e3852945a0ff50d1bbcb5ed42b6c7a568c546df171"
+checksum = "7265c9301c16a8711c992c2d8da90ee77ef54b1ed51482d6dfeb00dc756b1297"
 dependencies = [
  "rustls-pki-types",
 ]
@@ -8786,7 +8786,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -9271,7 +9271,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d6f32a0ff4a9f6f01231eb2059cc85479330739333e0e58cadf03b6af2cca10"
 dependencies = [
  "cfg-if 1.0.5",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
