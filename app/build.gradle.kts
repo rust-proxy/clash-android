@@ -25,7 +25,10 @@ val firebaseDebug = file("src/debug/google-services.json").isFile
 val baseVersionName = "0.5.4"
 val Project.verName: String get() = "${baseVersionName}$versionNameSuffix.${exec("git rev-parse --short HEAD")}"
 val Project.verCode: Int get() = exec("git rev-list --count HEAD").toInt()
-val Project.isDevVersion: Boolean get() = exec("git tag -l v$baseVersionName").isEmpty()
+val Project.isDevVersion: Boolean
+	get() =
+		providers.environmentVariable("GITHUB_REF").orNull?.let { !it.startsWith("refs/tags/v") }
+			?: exec("git tag --points-at HEAD --list v*").isEmpty()
 val Project.versionNameSuffix: String get() = if (isDevVersion) ".dev" else ""
 
 fun Project.exec(command: String): String =
@@ -105,6 +108,8 @@ android {
 		targetSdk = 37
 		versionCode = verCode
 		versionName = verName
+		buildConfigField("boolean", "TESTING_CHANNEL", isDevVersion.toString())
+		buildConfigField("String", "UPDATE_REPOSITORY", "\"${env("GITHUB_REPOSITORY") ?: "rust-proxy/clash-android"}\"")
 
 		resValue("string", "app_name", if (keystore == null) "clash android dev" else "clash android")
 		resValue("string", "app_ver", verName)

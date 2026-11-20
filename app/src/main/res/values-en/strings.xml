@@ -200,5 +200,25 @@
     <string name="lan_permission">Allow local network access in system settings to use LocalSend.</string>
     <string name="lan_pin_required">Check the receiver PIN and select the device again.</string>
     <string name="lan_declined">The receiver declined the transfer.</string>
+    <string name="update_title">Check for app updates</string>
+    <string name="update_channel">Update channel</string>
+    <string name="update_stable">Stable</string>
+    <string name="update_testing">Testing</string>
+    <string name="update_checking">Checking for updates…</string>
+    <string name="update_current">No newer build is available on this channel.</string>
+    <string name="update_downloading">Downloading and verifying APK · %1$d%%</string>
+    <string name="update_available">Update available: %1$s (%2$s)</string>
+    <string name="update_verified">%1$s has been verified. Installing may interrupt your VPN connection.</string>
+    <string name="update_download">Download update</string>
+    <string name="update_install">Install now</string>
+    <string name="update_check">Check again</string>
+    <string name="update_later">Later</string>
+    <string name="update_allow_source">Allow installs from this source, then return and tap Install now.</string>
+    <string name="update_no_installer">Could not open the system installer or installation settings.</string>
+    <string name="update_install_denied">Android blocked the installation. Check the installation permission.</string>
+    <string name="update_check_failed">Could not retrieve the update manifest for this channel. Try again later.</string>
+    <string name="update_download_failed">Download failed. Check your connection and free space, then check for updates again.</string>
+    <string name="update_invalid">The update failed verification. Check for updates again.</string>
+    <string name="update_no_abi">This release has no APK compatible with your device.</string>
 </resources>
 

@@ -15,6 +15,7 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
@@ -23,13 +24,16 @@ import androidx.core.content.ContextCompat
 import rs.clash.android.data.AppData
 import rs.clash.android.diagnostics.ProxyDiagnostics
 import rs.clash.android.theme.ClashAndroidTheme
+import rs.clash.android.ui.AppUpdateDialog
 import rs.clash.android.util.manualUiScale
 import rs.clash.android.util.recommendedUiScale
+import rs.clash.android.viewmodel.AppUpdateViewModel
 import rs.clash.android.viewmodel.ProfileViewModel
 import java.util.Locale
 import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
+	internal val updates: AppUpdateViewModel by viewModels()
 	private var exitUiRequested = false
 	internal var recommendedScale: Int = 100
 		private set
@@ -88,6 +92,7 @@ class MainActivity : ComponentActivity() {
 				}
 				Surface(color = MaterialTheme.colorScheme.background) {
 					ClashApp()
+					if (!BuildConfig.DEBUG && updates.visible) AppUpdateDialog(updates)
 				}
 			}
 		}
@@ -97,6 +102,7 @@ class MainActivity : ComponentActivity() {
 		super.onStart()
 		ProxyDiagnostics.recover(this)
 		AppData.vpn.attach()
+		if (!BuildConfig.DEBUG) updates.onForeground()
 	}
 
 	override fun onStop() {

@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Router
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -64,6 +65,7 @@ import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.annotation.RootGraph
 import com.ramcosta.composedestinations.generated.destinations.AppSelectorScreenDestination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
+import rs.clash.android.BuildConfig
 import rs.clash.android.MainActivity
 import rs.clash.android.R
 import rs.clash.android.model.MAX_UI_SCALE
@@ -251,6 +253,15 @@ fun SettingsScreen(
 						onClick = {},
 						showChevron = false,
 					)
+					if (!BuildConfig.DEBUG && activity != null) {
+						HorizontalDivider(modifier = Modifier.padding(start = 56.dp))
+						SettingsItem(
+							icon = Icons.Default.SystemUpdate,
+							title = stringResource(R.string.update_title),
+							subtitle = stringResource(activity.updates.channel.labelRes),
+							onClick = activity.updates::open,
+						)
+					}
 				}
 			}
 		}
@@ -526,7 +537,7 @@ private fun DarkModeDialog(
 }
 
 @Composable
-private fun PreferenceOption(
+internal fun PreferenceOption(
 	text: String,
 	selected: Boolean,
 	onClick: () -> Unit,

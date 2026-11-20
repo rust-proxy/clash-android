@@ -100,7 +100,7 @@ jobs:
         if: github.event_name != 'pull_request'
         id: version
         run: |
-          if [[ $GITHUB_REF == refs/tags/* ]]; then
+          if [[ $GITHUB_REF == refs/tags/v* ]]; then
             echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           else
             echo "version=dev-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
@@ -145,45 +145,6 @@ jobs:
             build/native-symbols-release.txt
           if-no-files-found: error
 
-      - name: Organize APKs
-        if: github.event_name != 'pull_request'
-        run: |
-          mkdir -p output
-          VERSION="${{ steps.version.outputs.version }}"
-          
-          # Copy and rename APKs
-          cp app/build/outputs/apk/release/*-arm64-v8a-release.apk output/clash-android-${VERSION}-arm64-v8a.apk || true
-          cp app/build/outputs/apk/release/*-armeabi-v7a-release.apk output/clash-android-${VERSION}-armeabi-v7a.apk || true
-          cp app/build/outputs/apk/release/*-x86-release.apk output/clash-android-${VERSION}-x86.apk || true
-          cp app/build/outputs/apk/release/*-x86_64-release.apk output/clash-android-${VERSION}-x86_64.apk || true
-          cp app/build/outputs/apk/release/*-universal-release.apk output/clash-android-${VERSION}-all.apk || true
-          
-          ls -lh output/
-
-      - name: Create and publish release
-        if: github.event_name != 'pull_request'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG_NAME: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'latest' }}
-        run: |
-          # Delete old latest release if creating a new latest release
-          if [ "$TAG_NAME" = "latest" ]; then
-            gh release delete "$TAG_NAME" --yes --cleanup-tag || true
-          fi
-          
-          # Create draft release with changelog
-          if [[ "$TAG_NAME" == v* ]]; then
-            gh release create "$TAG_NAME" --draft --latest --title "$TAG_NAME"
-          else
-            gh release create "$TAG_NAME" --draft --title "测试构建"
-          fi
-          
-          # Upload all package files
-          find ./output -type f -exec gh release upload "$TAG_NAME" {} \;
-          
-          # Upload LICENSE file
-          gh release upload "$TAG_NAME" LICENSE
-          
       - name: Determine commit range for changelog
         if: github.event_name != 'pull_request'
         id: commit-range
@@ -223,6 +184,36 @@ jobs:
         env:
           GITHUB_REPO: ${{ github.repository }}
           OUTPUT: CHANGELOG.md
+
+      - name: Prepare APKs and update manifest
+        if: github.event_name != 'pull_request'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: python3 .github/prepare-update.py app/build/outputs/apk/release/output-metadata.json output "$VERSION" CHANGELOG.md
+
+      - name: Create and publish release
+        if: github.event_name != 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'latest' }}
+        run: |
+          # Delete old latest release if creating a new latest release
+          if [ "$TAG_NAME" = "latest" ]; then
+            gh release delete "$TAG_NAME" --yes --cleanup-tag || true
+          fi
+
+          # Create draft release with changelog
+          if [[ "$TAG_NAME" == v* ]]; then
+            gh release create "$TAG_NAME" --draft --latest --title "$TAG_NAME"
+          else
+            gh release create "$TAG_NAME" --draft --title "测试构建"
+          fi
+
+          # Upload all package files
+          gh release upload "$TAG_NAME" output/*
+
+          # Upload LICENSE file
+          gh release upload "$TAG_NAME" LICENSE
 
       - name: Publish release
         if: github.event_name != 'pull_request'
