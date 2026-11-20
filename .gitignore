@@ -42,3 +42,8 @@ uniffi/.vscode/settings.json
 .claude/
 .claude/settings.local.json
 .reasonix
+.agents
+skills-lock.json
+.codex
+.codex-remote-attachments
+AGENTS.md
