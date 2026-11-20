@@ -131,6 +131,7 @@
     <string name="profile_import_success">Profile imported</string>
     <string name="profile_import_failed">Failed to import profile: %1$s</string>
     <string name="profile_activate_success">Switched to profile: %1$s</string>
+    <string name="vpn_restart_permission_required">Allow the VPN connection and start it from the home screen to apply the new configuration.</string>
     <string name="profile_deleted">Profile deleted: %1$s</string>
     <string name="profile_renamed">Profile renamed</string>
     <string name="profile_not_found">No profile found</string>
@@ -178,8 +179,8 @@
     <!-- Known issues -->
     <string name="known_issues_title">Known Issues</string>
     <string name="known_issues_home">The VPN runs in a separate process. You can reopen the app to manage the active connection.</string>
-    <string name="known_issues_profile">- clash-rs is not yet 100% compatible with mihomo configuration files, so you can verify a configuration file before applying it.\n- Restart the VPN to use the newly selected profile.</string>
-    <string name="known_issues_settings">- Some settings only take effect after the VPN is restarted.</string>
+    <string name="known_issues_profile">- clash-rs is not yet 100% compatible with mihomo configuration files, so you can verify a configuration file before applying it.\n- Switching profiles while the VPN is running reconnects it and closes existing connections.</string>
+    <string name="known_issues_settings">- Changing Fake IP or IPv6, or saving new app filter rules, reconnects a running VPN.</string>
     <string name="lan_send">Share</string>
     <string name="lan_receive">Receive via LocalSend</string>
     <string name="lan_waiting">Select this device in LocalSend on the other device.</string>

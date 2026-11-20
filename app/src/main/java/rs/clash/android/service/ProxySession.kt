@@ -38,19 +38,21 @@ internal class ProxySession(
 
 	suspend fun restart(intent: Intent) {
 		val binder = connection?.binder ?: return
-		attach()
-		try {
-			stopAndAwaitExit(binder)
-			snapshot.value = VpnSessionState()
-			// Bind before starting and keep this observer until the replacement reports
-			// running. An Activity going to background can otherwise unbind its last
-			// connection while Android is still bringing up the new service.
-			reconnect()
-			ContextCompat.startForegroundService(context, intent)
-			checkNotNull(withTimeoutOrNull(30_000) { state.first { it.running } }) { "VPN service did not report startup" }
-		} finally {
-			detach()
-		}
+		stopAndAwaitExit(binder)
+		snapshot.value = VpnSessionState()
+		reconnect()
+		ContextCompat.startForegroundService(context, intent)
+		// Binder death can arrive before ActivityManager removes the old process record.
+		// Redeliver an unacknowledged start once. TunService ignores it if already started.
+		val ready =
+			withTimeoutOrNull(30_000) {
+				if (withTimeoutOrNull(3_000) { state.first { it.running } } == null) {
+					ContextCompat.startForegroundService(context, intent)
+					state.first { it.running }
+				}
+				state.first { it.coreReady || !it.running }.coreReady
+			}
+		check(ready == true) { "VPN service did not report startup" }
 	}
 
 	private suspend fun stopAndAwaitExit(binder: IBinder) {
@@ -109,7 +111,7 @@ internal class ProxySession(
 				Handler(Looper.getMainLooper()) { message ->
 					if (connection === this && message.what == STATE) {
 						val running = message.arg1 != 0
-						snapshot.value = VpnSessionState(running, message.arg2.takeIf { running && it > 0 })
+						snapshot.value = VpnSessionState(running, message.arg2.takeIf { running && it > 0 }, message.arg1 == TunService.CORE_READY)
 					}
 					true
 				}

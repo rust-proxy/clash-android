@@ -143,6 +143,7 @@
     <string name="profile_import_success">配置文件导入成功</string>
     <string name="profile_import_failed">导入配置失败: %1$s</string>
     <string name="profile_activate_success">已切换到配置: %1$s</string>
+    <string name="vpn_restart_permission_required">请在首页重新授权并启动 VPN，以应用新的配置。</string>
     <string name="profile_deleted">配置已删除: %1$s</string>
     <string name="profile_renamed">配置已重命名</string>
     <string name="profile_not_found">未找到配置文件</string>
@@ -177,8 +178,8 @@
     <!-- Known issues -->
     <string name="known_issues_title">已知问题</string>
     <string name="known_issues_home">VPN 在独立进程中运行。重新打开应用即可管理当前连接。</string>
-    <string name="known_issues_profile">- 目前 clash-rs 并非100%兼容 mihomo 的配置文件, 应用配置文件前可先检验配置文件合法性。\n- 切换配置文件后，重新连接 VPN 即可生效。</string>
-    <string name="known_issues_settings">- 有些配置项需要重启 VPN 才可生效。</string>
+    <string name="known_issues_profile">- 目前 clash-rs 并非100%兼容 mihomo 的配置文件, 应用配置文件前可先检验配置文件合法性。\n- VPN 运行时切换配置会自动重连，现有连接会中断。</string>
+    <string name="known_issues_settings">- VPN 运行时，更改 Fake IP、IPv6 或保存新的应用过滤规则会自动重连。</string>
     <string name="lan_send">分享</string>
     <string name="lan_receive">从 LocalSend 接收</string>
     <string name="lan_waiting">请在另一台设备的 LocalSend 中选择本机。</string>

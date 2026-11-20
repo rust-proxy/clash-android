@@ -166,22 +166,7 @@ fun AppSelectorScreen(
 		floatingActionButton = {
 			FloatingActionButton(
 				onClick = {
-					// Save the selected apps
-					when (tempFilterMode) {
-						AppFilterMode.ALLOWED -> {
-							viewModel.updateAllowedApps(selectedApps)
-							viewModel.updateDisallowedApps(emptySet())
-						}
-						AppFilterMode.DISALLOWED -> {
-							viewModel.updateDisallowedApps(selectedApps)
-							viewModel.updateAllowedApps(emptySet())
-						}
-						AppFilterMode.ALL -> {
-							viewModel.updateAllowedApps(emptySet())
-							viewModel.updateDisallowedApps(emptySet())
-						}
-					}
-					viewModel.updateAppFilterMode(tempFilterMode)
+					viewModel.saveAppFilter(tempFilterMode, selectedApps)
 					navigator.navigateUp()
 				},
 			) {

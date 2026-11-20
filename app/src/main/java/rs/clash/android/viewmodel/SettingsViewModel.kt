@@ -8,7 +8,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
 import rs.clash.android.model.UI_SCALE_KEY
+import rs.clash.android.ui.snackbar.SnackbarController
 import rs.clash.android.util.manualUiScale
 
 enum class DarkModePreference {
@@ -141,27 +144,40 @@ class SettingsViewModel(
 	}
 
 	fun updateFakeIpEnabled(enabled: Boolean) {
+		if (fakeIpEnabled == enabled) return
 		fakeIpEnabled = enabled
 		prefs.edit { putBoolean("fake_ip", enabled) }
+		restartProxy()
 	}
 
 	fun updateIpv6Enabled(enabled: Boolean) {
+		if (ipv6Enabled == enabled) return
 		ipv6Enabled = enabled
 		prefs.edit { putBoolean("ipv6", enabled) }
+		restartProxy()
 	}
 
-	fun updateAppFilterMode(mode: AppFilterMode) {
-		appFilterMode = mode
-		prefs.edit { putString("app_filter_mode", mode.name) }
+	fun saveAppFilter(
+		mode: AppFilterMode,
+		apps: Set<String>,
+	) {
+		val allowed = if (mode == AppFilterMode.ALLOWED) apps else emptySet()
+		val disallowed = if (mode == AppFilterMode.DISALLOWED) apps else emptySet()
+		val changed =
+			mode != appFilterMode ||
+				(mode == AppFilterMode.ALLOWED && allowed != allowedApps) ||
+				(mode == AppFilterMode.DISALLOWED && disallowed != disallowedApps)
+		prefs.edit {
+			putString("app_filter_mode", mode.name)
+			putStringSet("allowed_apps", allowed)
+			putStringSet("disallowed_apps", disallowed)
+		}
+		if (changed) restartProxy()
 	}
 
-	fun updateAllowedApps(apps: Set<String>) {
-		allowedApps = apps
-		prefs.edit { putStringSet("allowed_apps", apps) }
-	}
-
-	fun updateDisallowedApps(apps: Set<String>) {
-		disallowedApps = apps
-		prefs.edit { putStringSet("disallowed_apps", apps) }
+	private fun restartProxy() {
+		viewModelScope.launch {
+			restartVpnForConfigChange(getApplication())?.let { SnackbarController.showMessage(it) }
+		}
 	}
 }

@@ -35,6 +35,7 @@ class TunService : VpnService() {
 	companion object {
 		internal const val CONFIG = "session_config"
 		internal const val STOP = "rs.clash.android.STOP_VPN"
+		internal const val CORE_READY = 2
 	}
 
 	private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -66,7 +67,13 @@ class TunService : VpnService() {
 
 	private fun sendState() {
 		try {
-			observer?.send(Message.obtain(null, ProxySession.STATE, if (started) 1 else 0, instance?.mixedPort()?.toInt() ?: 0))
+			val status =
+				when {
+					instance != null -> CORE_READY
+					started -> 1
+					else -> 0
+				}
+			observer?.send(Message.obtain(null, ProxySession.STATE, status, instance?.mixedPort()?.toInt() ?: 0))
 		} catch (_: RemoteException) {
 			observer = null
 		}

@@ -29,6 +29,7 @@ sealed interface VpnStartResult {
 data class VpnSessionState(
 	val running: Boolean = false,
 	val mixedPort: Int? = null,
+	val coreReady: Boolean = false,
 ) {
 	val localProxyUrl: String? get() = mixedPort?.let { "http://127.0.0.1:$it" }
 }
@@ -74,17 +75,38 @@ internal class AndroidVpnController(
 		if (!session.value.running) return VpnStartResult.Started
 		val task =
 			scope.async {
-				withStartIntent { proxy.restart(it) }
+				// Keep observing across replacements, even if the Activity goes to the background.
+				proxy.attach()
+				try {
+					var config: String?
+					var result: VpnStartResult
+					do {
+						config = sessionConfig()
+						result = withStartIntent(config) { proxy.restart(it) }
+					} while (result == VpnStartResult.Started && session.value.running && config != sessionConfig())
+					result
+				} finally {
+					proxy.detach()
+				}
 			}
 		restarting = task
 		return task.await()
 	}
 
-	private inline fun withStartIntent(launch: (Intent) -> Unit): VpnStartResult {
-		val path = context.getSharedPreferences("file_prefs", Context.MODE_PRIVATE).getString("profile_path", null)
-		if (path.isNullOrEmpty()) return VpnStartResult.MissingProfile
+	private inline fun withStartIntent(
+		config: String? = sessionConfig(),
+		launch: (Intent) -> Unit,
+	): VpnStartResult {
+		if (config == null) return VpnStartResult.MissingProfile
 		val permissionIntent = VpnService.prepare(context)
 		if (permissionIntent != null) return VpnStartResult.PermissionRequired(permissionIntent)
+		launch(Intent(context, TunService::class.java).putExtra(TunService.CONFIG, config))
+		return VpnStartResult.Started
+	}
+
+	private fun sessionConfig(): String? {
+		val path = context.getSharedPreferences("file_prefs", Context.MODE_PRIVATE).getString("profile_path", null)
+		if (path.isNullOrEmpty()) return null
 		val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
 		val mode = prefs.getString("app_filter_mode", "ALL") ?: "ALL"
 		val apps =
@@ -93,15 +115,13 @@ internal class AndroidVpnController(
 				"DISALLOWED" -> prefs.getStringSet("disallowed_apps", emptySet())
 				else -> emptySet()
 			}
-		val config =
-			JSONObject()
-				.put("path", path)
-				.put("mode", mode)
-				.put("apps", JSONArray(apps.orEmpty()))
-				.put("fakeIp", prefs.getBoolean("fake_ip", false))
-				.put("ipv6", prefs.getBoolean("ipv6", true))
-		launch(Intent(context, TunService::class.java).putExtra(TunService.CONFIG, config.toString()))
-		return VpnStartResult.Started
+		return JSONObject()
+			.put("path", path)
+			.put("mode", mode)
+			.put("apps", JSONArray(apps.orEmpty().sorted()))
+			.put("fakeIp", prefs.getBoolean("fake_ip", false))
+			.put("ipv6", prefs.getBoolean("ipv6", true))
+			.toString()
 	}
 
 	override fun stop() {

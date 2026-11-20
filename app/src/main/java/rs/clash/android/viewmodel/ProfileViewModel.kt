@@ -183,7 +183,7 @@ class ProfileViewModel(
 		}
 	}
 
-	private fun saveProfiles() {
+	private fun saveProfiles(activePath: String? = null) {
 		val jsonArray = JSONArray()
 		profiles.forEach { profile ->
 			jsonArray.put(profile.asJsonObject())
@@ -191,6 +191,7 @@ class ProfileViewModel(
 		
 		prefs.edit {
 			putString("profiles_list", jsonArray.toString())
+			if (activePath != null) putString("profile_path", activePath)
 		}
 	}
 
@@ -292,27 +293,21 @@ class ProfileViewModel(
 		context: Context,
 		profile: Profile,
 	) {
-		// Deactivate all profiles
-		val updatedProfiles = profiles.map { it.copy(isActive = false) }
-		profiles.clear()
-		profiles.addAll(updatedProfiles)
-		
-		// Activate selected profile
-		val index = profiles.indexOfFirst { it.id == profile.id }
-		if (index >= 0) {
-			profiles[index] = profiles[index].copy(isActive = true)
-			activeProfile = profiles[index]
-			savedFilePath = profiles[index].filePath
-			
-			// Update SharedPreferences
-			prefs.edit {
-				putString("profile_path", profiles[index].filePath)
-			}
-			
-			saveProfiles()
-			SnackbarController.showMessage(
-				getApplication<Application>().getString(R.string.profile_activate_success, profile.name),
-			)
+		val selected = profiles.firstOrNull { it.id == profile.id } ?: return
+		if (selected.isActive) return
+
+		for (index in profiles.indices) {
+			val entry = profiles[index]
+			val active = entry.id == selected.id
+			if (entry.isActive != active) profiles[index] = entry.copy(isActive = active)
+		}
+		activeProfile = profiles.first { it.id == selected.id }
+		savedFilePath = selected.filePath
+		saveProfiles(activePath = selected.filePath)
+
+		viewModelScope.launch {
+			val message = restartVpnForConfigChange(context) ?: context.getString(R.string.profile_activate_success, selected.name)
+			if (activeProfile?.id == selected.id) SnackbarController.showMessage(message)
 		}
 	}
 
