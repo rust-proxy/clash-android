@@ -11,10 +11,13 @@ import uniffi.clash_android_ffi.formatEyreError
 import android.app.Application as AndroidApplication
 
 class Application : AndroidApplication() {
+	internal var nativeTlsReady = false
+		private set
+
 	private external fun javaInit(
 		context: Context,
 		panicFile: String?,
-	)
+	): Boolean
 
 	override fun onCreate() {
 		super.onCreate()
@@ -31,7 +34,7 @@ class Application : AndroidApplication() {
 			if (BuildConfig.FIREBASE_ENABLED && process == "$packageName:proxy") ProxyDiagnostics.begin(this) else null
 		if (process == packageName) ProxyDiagnostics.recover(this)
 		System.loadLibrary("clash_android_ffi")
-		javaInit(this, panicFile)
+		nativeTlsReady = javaInit(this, panicFile)
 	}
 }
 

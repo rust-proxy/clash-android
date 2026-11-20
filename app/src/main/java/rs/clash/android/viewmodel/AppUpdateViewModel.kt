@@ -9,17 +9,16 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import rs.clash.android.BuildConfig
 import rs.clash.android.R
 import rs.clash.android.update.AppUpdate
 import rs.clash.android.update.GitHubUpdates
 import rs.clash.android.update.InvalidUpdate
+import rs.clash.android.update.NativeTlsUnavailable
 import rs.clash.android.update.UnsupportedAbi
 import rs.clash.android.update.UpdateChannel
 import rs.clash.android.update.UpdateManifest
@@ -136,10 +135,7 @@ internal class AppUpdateViewModel(
 		val update = (status as? UpdateStatus.Available)?.update ?: return
 		status = UpdateStatus.Downloading(0)
 		runOperation(R.string.update_download_failed) {
-			val file =
-				github.download(update) { percent ->
-					withContext(Dispatchers.Main.immediate) { status = UpdateStatus.Downloading(percent) }
-				}
+			val file = github.download(update) { percent -> status = UpdateStatus.Downloading(percent) }
 			status = UpdateStatus.Ready(update, file)
 			savedState["verified"] = Json.encodeToString(UpdateManifest.serializer(), update.manifest)
 		}
@@ -161,6 +157,7 @@ internal class AppUpdateViewModel(
 					val message =
 						when (failure) {
 							is InvalidUpdate -> R.string.update_invalid
+							is NativeTlsUnavailable -> R.string.update_tls_unavailable
 							is UnsupportedAbi -> R.string.update_no_abi
 							else -> failureMessage
 						}

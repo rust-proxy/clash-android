@@ -124,6 +124,19 @@ async fn fetch(
     user_agent: Option<String>,
     proxy_url: Option<String>,
 ) -> Result<reqwest::Response, EyreError> {
+    download_client(user_agent, proxy_url)?
+        .build()
+        .map_err(|e| eyre::eyre!("Failed to build HTTP client: {}", e))?
+        .get(url)
+        .send()
+        .await
+        .wrap_err("Failed to send download request")
+}
+
+pub(crate) fn download_client(
+    user_agent: Option<String>,
+    proxy_url: Option<String>,
+) -> Result<reqwest::ClientBuilder, EyreError> {
     let ua = user_agent.unwrap_or_else(|| "clash-android/1.0".to_string());
 
     // Build reqwest client. Its `rustls` feature verifies certificates with
@@ -140,15 +153,7 @@ async fn fetch(
         client_builder = client_builder.proxy(proxy);
     }
 
-    let client = client_builder
-        .build()
-        .map_err(|e| eyre::eyre!("Failed to build HTTP client: {}", e))?;
-
-    client
-        .get(url)
-        .send()
-        .await
-        .wrap_err("Failed to send download request")
+    Ok(client_builder)
 }
 
 async fn stage_download(

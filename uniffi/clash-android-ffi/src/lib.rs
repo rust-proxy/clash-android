@@ -33,6 +33,7 @@ use url::Host;
 
 pub mod controller;
 pub mod log;
+mod update;
 pub mod util;
 
 type EyreError = eyre::Error;
@@ -100,7 +101,7 @@ pub extern "system" fn java_init(
     _class: jni::objects::JClass,
     #[cfg_attr(not(target_os = "android"), allow(unused_variables))] context: jni::objects::JObject,
     panic_file: jni::objects::JString,
-) {
+) -> jni::sys::jboolean {
     use jni::{Outcome, errors::Result as JniResult};
 
     let vm: jni::JavaVM = {
@@ -196,10 +197,20 @@ pub extern "system" fn java_init(
             })
             .into_outcome()
         {
-            Outcome::Ok(_) => info!("Initialized rustls-platform-verifier"),
-            Outcome::Err(e) => error!("rustls-platform-verifier init JNI error: {e:?}"),
+            Outcome::Ok(_) => {
+                info!("Initialized rustls-platform-verifier");
+                jni::sys::JNI_TRUE
+            }
+            Outcome::Err(e) => {
+                error!("rustls-platform-verifier init JNI error: {e:?}");
+                jni::sys::JNI_FALSE
+            }
             Outcome::Panic(p) => std::panic::resume_unwind(p),
-        };
+        }
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        jni::sys::JNI_FALSE
     }
 }
 

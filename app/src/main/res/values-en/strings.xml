@@ -218,6 +218,7 @@
     <string name="update_install_denied">Android blocked the installation. Check the installation permission.</string>
     <string name="update_check_failed">Could not retrieve the update manifest for this channel. Try again later.</string>
     <string name="update_download_failed">Download failed. Check your connection and free space, then check for updates again.</string>
+    <string name="update_tls_unavailable">Android certificate verification could not be initialized. A secure connection to the update server is unavailable.</string>
     <string name="update_invalid">The update failed verification. Check for updates again.</string>
     <string name="update_no_abi">This release has no APK compatible with your device.</string>
 </resources>

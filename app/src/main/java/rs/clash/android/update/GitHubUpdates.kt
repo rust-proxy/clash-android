@@ -7,13 +7,19 @@ import androidx.core.content.pm.PackageInfoCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import rs.clash.android.BuildConfig
+import rs.clash.android.Global
+import rs.clash.android.data.AppData
+import uniffi.clash_android_ffi.DownloadProgress
+import uniffi.clash_android_ffi.DownloadProgressCallback
+import uniffi.clash_android_ffi.downloadApk
+import uniffi.clash_android_ffi.fetchUpdateManifest
 import java.io.File
 import java.io.IOException
-import java.io.InputStream
-import java.net.URL
-import javax.net.ssl.HttpsURLConnection
+
+internal class NativeTlsUnavailable : IOException()
 
 internal class GitHubUpdates(
 	private val context: Context,
@@ -22,24 +28,11 @@ internal class GitHubUpdates(
 
 	suspend fun check(channel: UpdateChannel): AppUpdate? =
 		withContext(Dispatchers.IO) {
-			readAsset("$releases/${channel.manifestPath}") { input ->
-				// Release notes are capped by CI. Bound the metadata read even on a bad response.
-				val buffer = ByteArray(64 * 1024)
-				var length = 0
-				while (length < buffer.size) {
-					val count = input.read(buffer, length, buffer.size - length)
-					if (count < 0) break
-					length += count
-				}
-				if (length == buffer.size) throw InvalidUpdate()
-				selectUpdate(
-					String(buffer, 0, length, Charsets.UTF_8),
-					channel,
-					context.packageName,
-					BuildConfig.VERSION_CODE.toLong(),
-					Build.SUPPORTED_ABIS.toList(),
-				)
-			}
+			if (!Global.application.nativeTlsReady) throw NativeTlsUnavailable()
+			val manifest =
+				fetchUpdateManifest("$releases/${channel.manifestPath}", AppData.vpn.session.value.localProxyUrl)
+					?: throw InvalidUpdate()
+			selectUpdate(manifest, channel, context.packageName, BuildConfig.VERSION_CODE.toLong(), Build.SUPPORTED_ABIS.toList())
 		}
 
 	private val directory = File(context.cacheDir, "app-updates")
@@ -52,7 +45,7 @@ internal class GitHubUpdates(
 			if (!file.isFile) return@withContext null
 			try {
 				file.inputStream().use { input ->
-					update.asset.copyVerified(input, null) { currentCoroutineContext().ensureActive() }
+					update.asset.verifyCachedBytes(input)
 				}
 				verifyPackage(file, update)
 				file
@@ -64,28 +57,34 @@ internal class GitHubUpdates(
 
 	suspend fun download(
 		update: AppUpdate,
-		onProgress: suspend (Int) -> Unit,
+		reportProgress: (Int) -> Unit,
 	): File =
 		withContext(Dispatchers.IO) {
 			verifiedCache(update)?.let { return@withContext it }
+			if (!Global.application.nativeTlsReady) throw NativeTlsUnavailable()
 			if (!directory.isDirectory && !directory.mkdirs()) throw IOException("APK cache unavailable")
 			val final = destination(update)
 			val cutoff = System.currentTimeMillis() - 7 * 24 * 60 * 60 * 1000L
 			directory.listFiles()?.filter { it != final && it.lastModified() < cutoff }?.forEach { it.delete() }
-			var lastProgress = -1
-			val report: suspend (Long) -> Unit = { bytes ->
-				currentCoroutineContext().ensureActive()
-				val percent = (bytes.toDouble() / update.asset.size * 100).toInt()
-				if (percent != lastProgress) {
-					lastProgress = percent
-					onProgress(percent)
-				}
-			}
 			val partial = File.createTempFile("download-", ".apk", directory)
 			try {
-				readAsset("$releases/download/${update.manifest.tag}/${update.asset.file}") { input ->
-					partial.outputStream().use { update.asset.copyVerified(input, it, report) }
-				}
+				val callback =
+					object : DownloadProgressCallback {
+						override fun onProgress(progress: DownloadProgress) {
+							val percent = (progress.downloaded.toDouble() / update.asset.size * 100).toInt()
+							launch(Dispatchers.Main.immediate) { reportProgress(percent) }
+						}
+					}
+				val verified =
+					downloadApk(
+						"$releases/download/${update.manifest.tag}/${update.asset.file}",
+						partial.absolutePath,
+						update.asset.size.toULong(),
+						update.asset.sha256,
+						AppData.vpn.session.value.localProxyUrl,
+						callback,
+					)
+				if (!verified) throw InvalidUpdate()
 				currentCoroutineContext().ensureActive()
 				verifyPackage(partial, update)
 				if (!partial.renameTo(final)) throw IOException("Cannot save verified APK")
@@ -126,31 +125,5 @@ internal class GitHubUpdates(
 				current.isNotEmpty() && current == archive.signatures?.toSet()
 			}
 		if (!matches) throw InvalidUpdate()
-	}
-
-	private suspend fun <T> readAsset(
-		address: String,
-		read: suspend (InputStream) -> T,
-	): T {
-		var url = URL(address)
-		repeat(6) {
-			currentCoroutineContext().ensureActive()
-			if (url.protocol != "https") throw InvalidUpdate()
-			val connection = url.openConnection() as HttpsURLConnection
-			try {
-				connection.instanceFollowRedirects = false
-				connection.connectTimeout = 15_000
-				connection.readTimeout = 30_000
-				connection.useCaches = false
-				when (val status = connection.responseCode) {
-					200 -> return connection.inputStream.use { read(it) }
-					301, 302, 303, 307, 308 -> url = URL(url, connection.getHeaderField("Location") ?: throw InvalidUpdate())
-					else -> throw IOException("HTTP $status")
-				}
-			} finally {
-				connection.disconnect()
-			}
-		}
-		throw IOException("Too many redirects")
 	}
 }

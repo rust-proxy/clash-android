@@ -30,6 +30,7 @@ tracing-subscriber = { version = "0.3", default-features = false, features = ["s
 paranoid-android = "0.2"
 color-eyre = "0.6"
 bytes = "1"
+sha2 = "0.10"
 
 ipnet = "2"
 jni = "0.22"

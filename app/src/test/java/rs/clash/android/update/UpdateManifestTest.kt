@@ -2,12 +2,10 @@ package rs.clash.android.update
 
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
-import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Test
-import java.io.ByteArrayOutputStream
 
 class UpdateManifestTest {
 	private val arm =
@@ -60,13 +58,11 @@ class UpdateManifestTest {
 	}
 
 	@Test
-	fun verifiesSizeAndHashBeforeAcceptingBytes() {
-		val output = ByteArrayOutputStream()
-		runTest { arm.copyVerified("abc".byteInputStream(), output) {} }
-		assertArrayEquals("abc".toByteArray(), output.toByteArray())
+	fun verifiesCachedApkSizeAndHash() {
+		runTest { arm.verifyCachedBytes("abc".byteInputStream()) }
 		for (body in listOf("ab", "abcd", "abd")) {
 			assertThrows(InvalidUpdate::class.java) {
-				runTest { arm.copyVerified(body.byteInputStream(), ByteArrayOutputStream()) {} }
+				runTest { arm.verifyCachedBytes(body.byteInputStream()) }
 			}
 		}
 	}

@@ -1,10 +1,11 @@
 package rs.clash.android.update
 
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.IOException
 import java.io.InputStream
-import java.io.OutputStream
 import java.security.MessageDigest
 
 internal enum class UpdateChannel(
@@ -78,22 +79,17 @@ internal fun selectUpdate(
 	return AppUpdate(release, abi, asset)
 }
 
-internal suspend fun UpdateAsset.copyVerified(
-	input: InputStream,
-	output: OutputStream?,
-	onBytes: suspend (Long) -> Unit,
-) {
+internal suspend fun UpdateAsset.verifyCachedBytes(input: InputStream) {
 	val digest = MessageDigest.getInstance("SHA-256")
 	val buffer = ByteArray(64 * 1024)
 	var total = 0L
 	while (true) {
+		currentCoroutineContext().ensureActive()
 		val count = input.read(buffer)
 		if (count < 0) break
 		total += count
 		if (total > size) throw InvalidUpdate()
 		digest.update(buffer, 0, count)
-		output?.write(buffer, 0, count)
-		onBytes(total)
 	}
 	if (total != size || digest.digest().joinToString("") { "%02x".format(it) } != sha256) throw InvalidUpdate()
 }
