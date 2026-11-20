@@ -19,11 +19,11 @@ import rs.clash.android.R
 import rs.clash.android.model.Profile
 import rs.clash.android.model.ProfileType
 import uniffi.clash_android_ffi.EyreException
-import uniffi.profile_transfer.Peer
-import uniffi.profile_transfer.TransferEvent
-import uniffi.profile_transfer.TransferException
-import uniffi.profile_transfer.TransferSession
-import uniffi.profile_transfer.openTransfer
+import uniffi.clash_android_ffi.Peer
+import uniffi.clash_android_ffi.TransferEvent
+import uniffi.clash_android_ffi.TransferException
+import uniffi.clash_android_ffi.TransferSession
+import uniffi.clash_android_ffi.openTransfer
 import java.io.File
 import java.net.Inet4Address
 

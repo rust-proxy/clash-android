@@ -1,6 +1,5 @@
 -keep class rs.clash.android.** { *; }
 -keep class uniffi.clash_android_ffi.** { *; }
--keep class uniffi.profile_transfer.** { *; }
 
 # JNA specific rules
 -dontwarn java.awt.*

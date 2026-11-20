@@ -1,3 +1,5 @@
+mod payload;
+
 use std::{
     net::Ipv4Addr,
     path::PathBuf,
@@ -5,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use crate::payload::{MAX_SIZE, Offer, file_info, subscription_name, subscription_url};
+use self::payload::{MAX_SIZE, Offer, file_info, subscription_name, subscription_url};
 use ipnet::Ipv4Net;
 use localsend::{
     crypto::cert::{SelfSignedCert, generate_self_signed},

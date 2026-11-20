@@ -55,6 +55,6 @@ opt-level = 3
 async-compat = { git = "https://github.com/element-hq/async-compat", rev = "5a27c8b290f1f1dcfc0c4ec22c464e38528aa591" }
 rustls = { git = "https://github.com/Watfaq/rustls.git", branch = "watfaq/0.23.45" }
 tokio-rustls = { git = "https://github.com/Watfaq/tokio-rustls.git", branch = "watfaq/0.26.4" }
-# ts_netmon 0.6.1 unconditionally exports PlatformMon on Android/iOS.
-# Match clash-rs's fix until a corrected tailscale release is available.
-ts_netmon = { git = "https://github.com/tailscale/tailscale-rs.git", rev = "2c67f76eab" }
+# Match clash-rs's Tailscale API and mobile network monitor fixes.
+tailscale = { git = "https://github.com/tailscale/tailscale-rs.git", rev = "9f7cec0447" }
+ts_netmon = { git = "https://github.com/tailscale/tailscale-rs.git", rev = "9f7cec0447" }

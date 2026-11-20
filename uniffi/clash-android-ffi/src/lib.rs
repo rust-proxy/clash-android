@@ -33,6 +33,7 @@ use url::Host;
 
 pub mod controller;
 pub mod log;
+mod profile_transfer;
 mod update;
 pub mod util;
 

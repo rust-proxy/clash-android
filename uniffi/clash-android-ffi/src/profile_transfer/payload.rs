@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use localsend::{crypto::hash::sha256_hex, model::transfer::FileDto};
 
-use crate::TransferError;
+use super::TransferError;
 
 pub const MAX_SIZE: u64 = 16 * 1024 * 1024;
 const MAX_URL_SIZE: u64 = 16 * 1024;

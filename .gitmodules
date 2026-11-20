@@ -1,3 +1,0 @@
-[submodule "localsend/upstream"]
-	path = localsend/upstream
-	url = https://github.com/localsend/localsend.git

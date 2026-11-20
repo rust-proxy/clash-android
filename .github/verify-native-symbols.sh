@@ -26,6 +26,10 @@ verify_lib() {
 }
 for abi in arm64-v8a armeabi-v7a x86 x86_64; do
   verify_lib "$abi" libclash_android_ffi.so "core/build/rustJniLibs/android/$abi/libclash_android_ffi.so"
-  verify_lib "$abi" libprofile_transfer.so "core/build/profileTransferJni/$abi/libprofile_transfer.so"
+  "${readelf[0]}" --dyn-syms --wide "$work/packed.so" | grep -w 'uniffi_clash_android_ffi_fn_func_open_transfer' > /dev/null
 done
+if unzip -Z1 "${apks[0]}" | grep -E '^lib/[^/]+/libprofile_transfer\.so$' > /dev/null; then
+  echo "Unexpected standalone profile-transfer library in APK" >&2
+  exit 1
+fi
 test -s "app/build/outputs/mapping/$variant/mapping.txt"
