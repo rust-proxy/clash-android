@@ -1,27 +1,26 @@
-#[cfg(unix)]
-use std::sync::OnceLock;
 use std::time::Duration;
 use std::{collections::HashMap, sync::Arc};
 
+use bytes::Bytes;
 use eyre::Context;
 #[cfg(unix)]
-use http_body_util::{BodyExt, Full};
-#[cfg(unix)]
-use hyper::Request;
-#[cfg(unix)]
-use hyper::body::Bytes;
-#[cfg(unix)]
-use hyper_util::client::legacy::Client;
-#[cfg(unix)]
-use hyper_util::rt::{TokioExecutor, TokioTimer};
-#[cfg(unix)]
-use hyperlocal::{UnixConnector, Uri as UnixUri};
+use once_cell::sync::OnceCell;
+use reqwest::Method;
 use serde::{Deserialize, Serialize};
 use urlencoding::encode;
 
 use crate::EyreError;
 
 const STATS_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
+
+fn proxy_path(name: &str) -> Result<String, EyreError> {
+    if matches!(name, "." | "..") {
+        eyre::bail!(
+            "Cannot address proxy or group named '{name}': reqwest normalizes dot path segments"
+        );
+    }
+    Ok(format!("/proxies/{}", encode(name)))
+}
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, uniffi::Enum)]
 #[serde(rename_all = "lowercase")]
@@ -177,7 +176,7 @@ pub struct ClashController {
     // Constructed in the first async request, inside the Tokio runtime. Reusing
     // the client also reuses its HTTP connection pool between polls.
     #[cfg(unix)]
-    client: OnceLock<Client<UnixConnector, Full<Bytes>>>,
+    client: OnceCell<reqwest::Client>,
 }
 
 #[uniffi::export(async_runtime = "tokio")]
@@ -188,7 +187,7 @@ impl ClashController {
         Arc::new(Self {
             socket_path,
             #[cfg(unix)]
-            client: OnceLock::new(),
+            client: OnceCell::new(),
         })
     }
 
@@ -207,7 +206,7 @@ impl ClashController {
             }]);
         }
 
-        let mut response: ProxiesResponse = self.request("GET", "/proxies", None).await?;
+        let mut response: ProxiesResponse = self.request(Method::GET, "/proxies", None).await?;
 
         // Get the order from GLOBAL proxy group's 'all' field
         if let Some(global_group) = response.proxies.remove("GLOBAL") {
@@ -251,8 +250,8 @@ impl ClashController {
             }
         );
 
-        let path = format!("/proxies/{}", encode(&group_name));
-        self.request_no_response("PUT", &path, Some(serde_json::to_vec(&body)?))
+        let path = proxy_path(&group_name)?;
+        self.request_no_response(Method::PUT, &path, Some(serde_json::to_vec(&body)?))
             .await
     }
 
@@ -267,24 +266,24 @@ impl ClashController {
         let timeout_ms = timeout.unwrap_or(5000);
 
         let path = format!(
-            "/proxies/{}/delay?url={}&timeout={}",
-            encode(&name),
+            "{}/delay?url={}&timeout={}",
+            proxy_path(&name)?,
             encode(&test_url),
             timeout_ms
         );
-        self.request("GET", &path, None).await
+        self.request(Method::GET, &path, None).await
     }
 
     /// Get memory statistics.
     pub async fn get_memory(&self) -> Result<MemoryResponse, EyreError> {
-        self.request("GET", "/memory", None).await
+        self.request(Method::GET, "/memory", None).await
     }
 
     /// Get active connections
     pub async fn get_connections(&self) -> Result<ConnectionsResponse, EyreError> {
         tokio::time::timeout(
             STATS_REQUEST_TIMEOUT,
-            self.request("GET", "/connections", None),
+            self.request(Method::GET, "/connections", None),
         )
         .await
         .wrap_err("Connection statistics request timed out")?
@@ -297,7 +296,7 @@ impl ClashController {
     pub async fn get_overview(&self) -> Result<OverviewResponse, EyreError> {
         let snapshot: OverviewSnapshot = tokio::time::timeout(
             STATS_REQUEST_TIMEOUT,
-            self.request("GET", "/connections", None),
+            self.request(Method::GET, "/connections", None),
         )
         .await
         .wrap_err("Overview statistics request timed out")??;
@@ -306,14 +305,14 @@ impl ClashController {
 
     /// Get current configuration
     pub async fn get_configs(&self) -> Result<ConfigResponse, EyreError> {
-        self.request("GET", "/configs", None).await
+        self.request(Method::GET, "/configs", None).await
     }
 
     /// Update configuration
     pub async fn update_config(&self, config: HashMap<String, String>) -> Result<(), EyreError> {
         let body_bytes = serde_json::to_vec(&config).wrap_err("Failed to serialize config")?;
 
-        self.request_no_response("PATCH", "/configs", Some(body_bytes))
+        self.request_no_response(Method::PATCH, "/configs", Some(body_bytes))
             .await
     }
 
@@ -336,91 +335,50 @@ impl ClashController {
     }
 }
 
-#[cfg(unix)]
 impl ClashController {
+    #[cfg(unix)]
     async fn do_request(
         &self,
-        method: &str,
+        method: Method,
         path: &str,
         body: Option<Vec<u8>>,
-    ) -> Result<hyper::body::Bytes, EyreError> {
-        let client = self.client.get_or_init(|| {
-            Client::builder(TokioExecutor::new())
-                .pool_timer(TokioTimer::new())
+    ) -> Result<Bytes, EyreError> {
+        let client = self.client.get_or_try_init(|| {
+            reqwest::Client::builder()
+                .unix_socket(self.socket_path.as_str())
+                .http1_only()
+                .no_proxy()
+                .redirect(reqwest::redirect::Policy::none())
+                .retry(reqwest::retry::never())
                 .pool_idle_timeout(Duration::from_secs(15))
                 .pool_max_idle_per_host(1)
-                .build(UnixConnector)
-        });
-        let uri: hyper::Uri = UnixUri::new(&self.socket_path, path).into();
-
-        let request_builder = Request::builder()
-            .uri(uri)
-            .method(method)
-            .header("Content-Type", "application/json");
-
-        let request = if let Some(body_data) = body {
-            request_builder
-                .body(Full::new(Bytes::from(body_data)))
-                .wrap_err("Failed to build request with body")?
-        } else {
-            request_builder
-                .body(Full::new(Bytes::new()))
-                .wrap_err("Failed to build request")?
-        };
-
-        let response = client
-            .request(request)
-            .await
-            .wrap_err("HTTP request failed")?;
-
-        if !response.status().is_success() {
-            return Err(eyre::eyre!("HTTP status error: {}", response.status()));
+                .build()
+                .wrap_err("Failed to build controller HTTP client")
+        })?;
+        // localhost supplies the HTTP authority. The client connects only to the configured socket.
+        let mut request = client
+            .request(method, format!("http://localhost{path}"))
+            .header(reqwest::header::CONTENT_TYPE, "application/json");
+        if let Some(body) = body {
+            request = request.body(body);
         }
-
+        let response = request.send().await.wrap_err("HTTP request failed")?;
+        if !response.status().is_success() {
+            eyre::bail!("HTTP status error: {}", response.status());
+        }
         response
-            .into_body()
-            .collect()
+            .bytes()
             .await
             .wrap_err("Failed to read response body")
-            .map(|b| b.to_bytes())
     }
 
-    async fn request_no_response(
-        &self,
-        method: &str,
-        path: &str,
-        body: Option<Vec<u8>>,
-    ) -> Result<(), EyreError> {
-        self.do_request(method, path, body).await.map(|_| ())
-    }
-
-    async fn request<T>(
-        &self,
-        method: &str,
-        path: &str,
-        body: Option<Vec<u8>>,
-    ) -> Result<T, EyreError>
-    where
-        T: serde::de::DeserializeOwned,
-    {
-        let body_bytes = self.do_request(method, path, body).await?;
-        serde_json::from_slice(&body_bytes).wrap_err_with(|| {
-            format!(
-                "Failed to parse JSON response: {}",
-                String::from_utf8_lossy(&body_bytes)
-            )
-        })
-    }
-}
-
-#[cfg(not(unix))]
-impl ClashController {
+    #[cfg(not(unix))]
     async fn do_request(
         &self,
-        _method: &str,
+        _method: Method,
         _path: &str,
         _body: Option<Vec<u8>>,
-    ) -> Result<hyper::body::Bytes, EyreError> {
+    ) -> Result<Bytes, EyreError> {
         Err(eyre::eyre!(
             "ClashController requires Unix domain sockets, which are not available on this platform"
         ))
@@ -428,7 +386,7 @@ impl ClashController {
 
     async fn request_no_response(
         &self,
-        method: &str,
+        method: Method,
         path: &str,
         body: Option<Vec<u8>>,
     ) -> Result<(), EyreError> {
@@ -437,7 +395,7 @@ impl ClashController {
 
     async fn request<T>(
         &self,
-        method: &str,
+        method: Method,
         path: &str,
         body: Option<Vec<u8>>,
     ) -> Result<T, EyreError>
@@ -509,50 +467,7 @@ mod tests {
             assert!(serde_json::from_str::<OverviewSnapshot>(json).is_err());
         }
     }
-
-    #[cfg(unix)]
-    #[tokio::test]
-    async fn overview_reuses_the_unix_http_connection() {
-        use tokio::io::{AsyncReadExt, AsyncWriteExt};
-
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("controller.sock");
-        let listener = tokio::net::UnixListener::bind(&path).unwrap();
-        let server = tokio::spawn(async move {
-            // Accept exactly one socket. The second request must reuse it.
-            let (mut socket, _) = listener.accept().await.unwrap();
-            let body = r#"{"downloadTotal":7,"uploadTotal":3,"memory":12,"connections":[]}"#;
-            for _ in 0..2 {
-                let mut request = Vec::new();
-                while !request.ends_with(b"\r\n\r\n") {
-                    request.push(socket.read_u8().await.unwrap());
-                }
-                assert!(request.starts_with(b"GET /connections HTTP/1.1\r\n"));
-                socket
-                    .write_all(
-                        format!(
-                            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{body}",
-                            body.len()
-                        )
-                        .as_bytes(),
-                    )
-                    .await
-                    .unwrap();
-            }
-        });
-        let controller = ClashController::new(path.to_str().unwrap().to_owned());
-        let result = tokio::time::timeout(Duration::from_secs(3), async {
-            for _ in 0..2 {
-                let response = controller.get_overview().await.unwrap();
-                assert_eq!(response.download_total, 7);
-                assert_eq!(response.connection_count, 0);
-            }
-        })
-        .await;
-        if result.is_err() {
-            server.abort();
-        }
-        result.expect("successive polls should reuse the same HTTP connection");
-        server.await.unwrap();
-    }
 }
+
+#[cfg(all(test, unix))]
+mod unix_tests;

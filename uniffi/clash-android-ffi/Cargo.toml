@@ -38,9 +38,6 @@ url = "2"
 # HTTP client dependencies
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-hyper = { version = "1", features = ["client", "http1"] }
-hyper-util = { version = "0.1", features = ["client", "client-legacy", "tokio"] }
-http-body-util = "0.1"
 # reqwest's `rustls` feature verifies TLS through `rustls-platform-verifier`
 # (the OS/Android trust store) instead of bundled webpki roots.
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "stream"] }
@@ -57,8 +54,6 @@ mimalloc = { version = "0.1", default-features = false, optional = true }
 tempfile = "3"
 
 [target.'cfg(unix)'.dependencies]
-hyperlocal = "0.9"
-
 hyper-http-proxy = { version = "1", default-features = false, features = ["rustls-tls-webpki-roots"] }
 
 hyper-rustls = { version = "0.27", features = ["rustls-platform-verifier", "http1", "tls12", "logging", "aws-lc-rs"] }
