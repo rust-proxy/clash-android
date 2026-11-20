@@ -16,11 +16,12 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
+import kotlinx.serialization.SerializationException
 import rs.clash.android.Global
 import rs.clash.android.R
 import rs.clash.android.data.AppData
 import rs.clash.android.model.Profile
+import rs.clash.android.model.ProfileListJson
 import rs.clash.android.model.ProfileType
 import rs.clash.android.ui.snackbar.SnackbarController
 import uniffi.clash_android_ffi.DownloadProgress
@@ -106,12 +107,10 @@ class ProfileViewModel(
 					isActive =
 						profiles.isEmpty() && savedFilePath == null,
 				)
-			val list = JSONArray()
-			(profiles + profile).forEach { list.put(it.asJsonObject()) }
-			prefs.edit {
-				putString("profiles_list", list.toString())
-				if (profile.isActive) putString("profile_path", profile.filePath)
-			}
+			saveProfiles(
+				activePath = profile.filePath.takeIf { profile.isActive },
+				list = profiles + profile,
+			)
 			profiles.add(profile)
 			if (profile.isActive) {
 				activeProfile = profile
@@ -162,38 +161,26 @@ class ProfileViewModel(
 	}
 
 	private fun loadProfiles() {
-		val profilesJson = prefs.getString("profiles_list", null)
-		
-		profiles.clear()
-		if (profilesJson != null) {
+		val stored = prefs.getString("profiles_list", null)
+		val loaded =
 			try {
-				val jsonArray = JSONArray(profilesJson)
-				val loadedProfiles = mutableListOf<Profile>()
-				
-				for (i in 0 until jsonArray.length()) {
-					val jsonObject = jsonArray.getJSONObject(i)
-					val profile = Profile(jsonObject)
-					loadedProfiles.add(profile)
-				}
-				
-				profiles.addAll(loadedProfiles)
-				
-				// Update active profile
-				activeProfile = profiles.firstOrNull { it.isActive }
-			} catch (e: Exception) {
-				e.printStackTrace()
+				stored?.let(ProfileListJson::decode).orEmpty()
+			} catch (_: SerializationException) {
+				// Decoder errors can contain subscription URLs from the stored JSON.
+				Log.w("ProfileViewModel", "Could not read saved profile list")
+				return
 			}
-		}
+		profiles.clear()
+		profiles.addAll(loaded)
+		activeProfile = loaded.firstOrNull { it.isActive }
 	}
 
-	private fun saveProfiles(activePath: String? = null) {
-		val jsonArray = JSONArray()
-		profiles.forEach { profile ->
-			jsonArray.put(profile.asJsonObject())
-		}
-		
+	private fun saveProfiles(
+		activePath: String? = null,
+		list: List<Profile> = profiles,
+	) {
 		prefs.edit {
-			putString("profiles_list", jsonArray.toString())
+			putString("profiles_list", ProfileListJson.encode(list))
 			if (activePath != null) putString("profile_path", activePath)
 		}
 	}

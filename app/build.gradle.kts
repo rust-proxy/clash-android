@@ -9,6 +9,7 @@ plugins {
 	alias(libs.plugins.google.services)
 	alias(libs.plugins.firebase.crashlytics)
 	alias(libs.plugins.kotlin.compose)
+	alias(libs.plugins.kotlin.serialization)
 	alias(libs.plugins.ksp)
 	alias(libs.plugins.ktlint)
 }
@@ -187,6 +188,7 @@ dependencies {
 	implementation(libs.firebase.analytics)
 	implementation(libs.firebase.crashlytics.ndk)
 	implementation(libs.protobuf.lite)
+	implementation(libs.kotlinx.serialization.json)
 	implementation(project(":core"))
 	// Kotlin half of `rustls-platform-verifier`; the version is pinned to the
 	// `rustls-platform-verifier-android` crate by the resolution strategy above.
