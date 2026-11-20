@@ -137,11 +137,10 @@ android {
 				mappingFileUploadEnabled = firebaseRelease && providers.gradleProperty("uploadFirebaseMapping").orNull == "true"
 				nativeSymbolUploadEnabled = firebaseRelease
 				unstrippedNativeLibsDir =
-					project(":core")
-						.layout.buildDirectory
-						.dir("rustJniLibs/android")
-						.get()
-						.asFile
+					files(
+						project(":core").layout.buildDirectory.dir("rustJniLibs/android"),
+						project(":core").layout.buildDirectory.dir("profileTransferJni"),
+					)
 			}
 			isMinifyEnabled = true
 			isShrinkResources = true
@@ -177,6 +176,10 @@ android {
 }
 kotlin {
 	jvmToolchain(25)
+}
+
+tasks.matching { it.name == "generateCrashlyticsSymbolFileRelease" }.configureEach {
+	dependsOn(":core:cargoBuild", ":core:buildProfileTransfer")
 }
 
 dependencies {

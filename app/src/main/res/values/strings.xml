@@ -127,6 +127,11 @@
 
     <!-- Profile Screen -->
     <string name="profile_add_remote">添加远程配置</string>
+    <string name="profile_add">添加配置</string>
+    <string name="profile_next">下一步</string>
+    <string name="profile_local_description">从本机选择 Clash 配置文件，命名后导入。</string>
+    <string name="profile_remote_description">输入订阅链接下载配置，以后可从同一链接更新。</string>
+    <string name="profile_receive_description">接收同一局域网内其他设备分享的文件。Clash 校验通过后会导入为新的本地配置，重名时自动编号。</string>
     <string name="profile_config_name">配置名称</string>
     <string name="profile_subscription_url">订阅 URL</string>
     <string name="profile_downloading">正在下载配置...</string>
@@ -152,14 +157,14 @@
     <string name="profile_url_placeholder">https://example.com/config.yaml</string>
     <string name="profile_name_placeholder">我的远程配置</string>
     <string name="profile_all_profiles">所有配置 (%1$d)</string>
-    <string name="profile_update_config">更新配置</string>
+    <string name="profile_update_config">更新</string>
     <string name="profile_remote_added">远程配置添加成功</string>
     <string name="profile_remote_add_failed">添加远程配置失败: %1$s</string>
     <string name="profile_remote_verify_failed">配置文件验证失败: %1$s</string>
     <string name="profile_remote_update_failed">更新配置失败: %1$s</string>
     <string name="profile_config_updated">配置更新成功</string>
-    <string name="profile_set_active">设为活动配置</string>
-    <string name="profile_rename">重命名配置</string>
+    <string name="profile_set_active">激活</string>
+    <string name="profile_rename">重命名</string>
     <string name="profile_delete">删除</string>
     <string name="profile_unknown_error">未知错误</string>
     <string name="profile_verify_btn">验证配置</string>
@@ -174,4 +179,24 @@
     <string name="known_issues_home">VPN 在独立进程中运行。重新打开应用即可管理当前连接。</string>
     <string name="known_issues_profile">- 目前 clash-rs 并非100%兼容 mihomo 的配置文件, 应用配置文件前可先检验配置文件合法性。\n- 切换配置文件后，重新连接 VPN 即可生效。</string>
     <string name="known_issues_settings">- 有些配置项需要重启 VPN 才可生效。</string>
+    <string name="lan_send">分享</string>
+    <string name="lan_receive">从 LocalSend 接收</string>
+    <string name="lan_waiting">请在另一台设备的 LocalSend 中选择本机。</string>
+    <string name="lan_receiving">正在接收并校验配置…</string>
+    <string name="lan_discovering">正在查找附近设备…</string>
+    <string name="lan_accept">接收并导入</string>
+    <string name="lan_decline">拒绝</string>
+    <string name="lan_offer">%1$s 想发送 %2$s（%3$s）</string>
+    <string name="lan_cancelled">对方已取消传输。</string>
+    <string name="lan_address">局域网 IPv4 地址（可含端口）</string>
+    <string name="lan_find">连接设备</string>
+    <string name="lan_pin">对方的 PIN（如需要）</string>
+    <string name="lan_sent">配置已发送。</string>
+    <string name="lan_imported">已导入本地配置「%1$s」。</string>
+    <string name="lan_invalid">Clash 校验失败，未导入配置。</string>
+    <string name="lan_failed">操作失败，请检查局域网连接及对方设备后重试。</string>
+    <string name="lan_size">请选择 1 字节至 16 MiB 的配置文件。</string>
+    <string name="lan_permission">请在系统设置中允许访问局域网，以使用 LocalSend。</string>
+    <string name="lan_pin_required">请检查对方的 PIN，再点选设备重试。</string>
+    <string name="lan_declined">对方已拒绝接收。</string>
 </resources>

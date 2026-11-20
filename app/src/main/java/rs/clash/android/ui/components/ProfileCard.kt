@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CardDefaults
@@ -131,6 +132,7 @@ fun ActiveProfileCard(
 @Composable
 fun ProfileCard(
 	profile: Profile,
+	onSend: () -> Unit,
 	onActivate: () -> Unit,
 	onDelete: () -> Unit,
 	onRename: (String) -> Unit,
@@ -245,6 +247,16 @@ fun ProfileCard(
 					expanded = showMenu.value,
 					onDismissRequest = { showMenu.value = false },
 				) {
+					DropdownMenuItem(
+						text = { Text(stringResource(R.string.lan_send)) },
+						onClick = {
+							showMenu.value = false
+							onSend()
+						},
+						leadingIcon = {
+							Icon(Icons.Default.Share, contentDescription = null)
+						},
+					)
 					if (!profile.isActive) {
 						DropdownMenuItem(
 							text = { Text(stringResource(R.string.profile_set_active)) },

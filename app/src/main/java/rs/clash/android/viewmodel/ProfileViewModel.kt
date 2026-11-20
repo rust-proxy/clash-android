@@ -72,7 +72,52 @@ class ProfileViewModel(
 
 	// Multiple profiles support
 	val profiles = mutableStateListOf<Profile>()
-	
+	internal val transfer = ProfileTransfer(application, viewModelScope, ::importReceivedProfile)
+
+	private suspend fun importReceivedProfile(
+		source: File,
+		offeredName: String,
+	): String {
+		// Keep the sender's name out of filesystem paths. Existing local and subscription
+		// imports use filesDir/<display name>, so reserve a separate directory for LAN copies.
+		val directory = File(getApplication<Application>().filesDir, "received-profiles")
+		check(directory.isDirectory || directory.mkdir())
+		val file = File.createTempFile("profile-", ".yaml", directory)
+		var imported = false
+		try {
+			withContext(Dispatchers.IO) {
+				source.inputStream().use { input -> file.outputStream().use { input.copyTo(it) } }
+				verifyConfig(file.absolutePath)
+			}
+			val base = sanitizeProfileFileName(offeredName.substringAfterLast('/').substringAfterLast('\\').substringBeforeLast('.'))
+			val names = profiles.mapTo(mutableSetOf()) { it.name }
+			val name = generateSequence(1) { it + 1 }.map { if (it == 1) base else "$base ($it)" }.first { it !in names }
+			val profile =
+				Profile(
+					name = name,
+					filePath = file.absolutePath,
+					fileSize = file.length(),
+					isActive =
+						profiles.isEmpty() && savedFilePath == null,
+				)
+			val list = JSONArray()
+			(profiles + profile).forEach { list.put(it.asJsonObject()) }
+			prefs.edit {
+				putString("profiles_list", list.toString())
+				if (profile.isActive) putString("profile_path", profile.filePath)
+			}
+			profiles.add(profile)
+			if (profile.isActive) {
+				activeProfile = profile
+				savedFilePath = profile.filePath
+			}
+			imported = true
+			return name
+		} finally {
+			if (!imported) file.delete()
+		}
+	}
+
 	var activeProfile by mutableStateOf<Profile?>(null)
 		private set
 

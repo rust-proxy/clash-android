@@ -10,9 +10,9 @@ mkdir -p build
 manifest="build/native-symbols-$variant.txt"
 git rev-parse HEAD > "$manifest"
 build_id() { "${readelf[0]}" -n "$1" | awk '/Build ID:/ {print $3}'; }
-for abi in arm64-v8a armeabi-v7a x86 x86_64; do
-  lib=libclash_android_ffi.so
-  symbols="core/build/rustJniLibs/android/$abi/$lib"
+verify_lib() {
+  local abi=$1 lib=$2 symbols=$3
+
   unzip -p "${apks[0]}" "lib/$abi/$lib" > "$work/packed.so"
   id=$(build_id "$symbols")
   [[ -n "$id" && "$id" == "$(build_id "$work/packed.so")" ]] || { echo "Missing or mismatched build ID for $abi" >&2; exit 1; }
@@ -23,5 +23,9 @@ for abi in arm64-v8a armeabi-v7a x86 x86_64; do
   generated=( app/build/crashlytics/"$variant"/nativeSymbols/*-"$id".sym )
   [[ ${#generated[@]} == 1 && -s "${generated[0]}" ]] || { echo "Missing or ambiguous Crashlytics symbol file for $abi ($id)" >&2; exit 1; }
   echo "$abi $lib $id" | tee -a "$manifest"
+}
+for abi in arm64-v8a armeabi-v7a x86 x86_64; do
+  verify_lib "$abi" libclash_android_ffi.so "core/build/rustJniLibs/android/$abi/libclash_android_ffi.so"
+  verify_lib "$abi" libprofile_transfer.so "core/build/profileTransferJni/$abi/libprofile_transfer.so"
 done
 test -s "app/build/outputs/mapping/$variant/mapping.txt"

@@ -94,7 +94,26 @@ cargo {
 }
 
 val rustJniLibsDir = layout.buildDirectory.dir("rustJniLibs/android").get()!!
+val transferDir = rootProject.layout.projectDirectory.dir("localsend")
+val transferJni = layout.buildDirectory.dir("profileTransferJni")
+val androidNdk = androidComponents.sdkComponents.ndkDirectory
+val buildProfileTransfer = tasks.register<Exec>("buildProfileTransfer") {
+	workingDir(transferDir)
+	inputs.files(transferDir.file("Cargo.toml"), transferDir.file("Cargo.lock"), transferDir.file("build.rs"))
+	inputs.dir(transferDir.dir("src"))
+	inputs.dir(transferDir.dir("upstream/packages/core"))
+	inputs.property("ndk", android.ndkVersion.orEmpty())
+	outputs.dir(transferJni)
+	doFirst { environment("ANDROID_NDK_HOME", androidNdk.get().asFile.absolutePath) }
+	commandLine(
+		"cargo", "ndk", "--platform", "23", "-t", "arm64-v8a", "-t", "armeabi-v7a",
+		"-t", "x86", "-t", "x86_64", "-o", transferJni.get().asFile.absolutePath,
+		"build", "--release", "--locked",
+	)
+}
+android.sourceSets["main"].jniLibs.srcDir(transferJni.get().asFile)
 tasks.matching { it.name.matches(Regex("merge.*JniLibFolders")) }.configureEach {
     inputs.dir(rustJniLibsDir)
     dependsOn("cargoBuild")
+	dependsOn(buildProfileTransfer)
 }

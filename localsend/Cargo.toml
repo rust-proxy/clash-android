@@ -1,0 +1,21 @@
+[package]
+name = "profile-transfer"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+localsend = { path = "upstream/packages/core", features = ["discovery"] }
+uniffi = { version = "=0.32.2", features = ["tokio"] }
+tokio = { version = "1", features = ["sync", "fs", "time"] }
+tokio-util = "0.7"
+ipnet = "2"
+thiserror = "2"
+
+[profile.release]
+opt-level = "s"
+debug = "line-tables-only"
+strip = "none"

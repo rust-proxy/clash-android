@@ -147,13 +147,18 @@
 
     <!-- Profile Screen (additional) -->
     <string name="profile_add_remote">Add Remote Profile</string>
+    <string name="profile_add">Add profile</string>
+    <string name="profile_next">Next</string>
+    <string name="profile_local_description">Choose a Clash configuration file on this device and give it a name to import it.</string>
+    <string name="profile_remote_description">Download a profile from a subscription URL. You can update it later using the same URL.</string>
+    <string name="profile_receive_description">Receive a file from another device on the same network. Clash validates it before adding a new local profile. Profiles with the same name are kept separately.</string>
     <string name="profile_config_name">Profile Name</string>
     <string name="profile_subscription_url">Subscription URL</string>
     <string name="profile_downloading">Downloading profile...</string>
     <string name="profile_enter_config_name">Enter profile name</string>
     <string name="profile_my_config">My Profiles</string>
-    <string name="profile_remote_config">Remote Profiles</string>
-    <string name="profile_local_config">Local Profiles</string>
+    <string name="profile_remote_config">Remote profile</string>
+    <string name="profile_local_config">Local profile</string>
     <string name="profile_no_active">No active profile</string>
     <string name="profile_auto_update">Enable auto update</string>
     <string name="profile_ua_label">User-Agent (optional)</string>
@@ -163,9 +168,9 @@
     <string name="profile_url_placeholder">https://example.com/config.yaml</string>
     <string name="profile_name_placeholder">My Remote Profile</string>
     <string name="profile_all_profiles">All profiles (%1$d)</string>
-    <string name="profile_update_config">Update Profile</string>
-    <string name="profile_set_active">Set as Active Profile</string>
-    <string name="profile_rename">Rename Profile</string>
+    <string name="profile_update_config">Update</string>
+    <string name="profile_set_active">Activate</string>
+    <string name="profile_rename">Rename</string>
     <string name="profile_delete">Delete</string>
     <string name="profile_verify_btn">Verify Configuration</string>
     <string name="profile_active_config">Current Active Profile</string>
@@ -175,5 +180,25 @@
     <string name="known_issues_home">The VPN runs in a separate process. You can reopen the app to manage the active connection.</string>
     <string name="known_issues_profile">- clash-rs is not yet 100% compatible with mihomo configuration files, so you can verify a configuration file before applying it.\n- Restart the VPN to use the newly selected profile.</string>
     <string name="known_issues_settings">- Some settings only take effect after the VPN is restarted.</string>
+    <string name="lan_send">Share</string>
+    <string name="lan_receive">Receive via LocalSend</string>
+    <string name="lan_waiting">Select this device in LocalSend on the other device.</string>
+    <string name="lan_receiving">Receiving and validating profile…</string>
+    <string name="lan_discovering">Finding nearby devices…</string>
+    <string name="lan_accept">Accept and import</string>
+    <string name="lan_decline">Decline</string>
+    <string name="lan_offer">%1$s wants to send %2$s (%3$s)</string>
+    <string name="lan_cancelled">The sender cancelled the transfer.</string>
+    <string name="lan_address">LAN IPv4 address (optional port)</string>
+    <string name="lan_find">Find device</string>
+    <string name="lan_pin">Receiver PIN (if required)</string>
+    <string name="lan_sent">Profile sent.</string>
+    <string name="lan_imported">Imported local profile “%1$s”.</string>
+    <string name="lan_invalid">Clash rejected the configuration. Nothing was imported.</string>
+    <string name="lan_failed">Operation failed. Check the LAN connection and the other device, then retry.</string>
+    <string name="lan_size">Choose a profile between 1 byte and 16 MiB.</string>
+    <string name="lan_permission">Allow local network access in system settings to use LocalSend.</string>
+    <string name="lan_pin_required">Check the receiver PIN and select the device again.</string>
+    <string name="lan_declined">The receiver declined the transfer.</string>
 </resources>
 
