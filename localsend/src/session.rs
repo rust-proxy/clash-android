@@ -1,17 +1,14 @@
 use std::{
-    collections::HashMap,
     net::Ipv4Addr,
     path::PathBuf,
     sync::{Arc, Mutex, OnceLock},
     time::Duration,
 };
 
+use crate::payload::{MAX_SIZE, Offer, file_info, subscription_name, subscription_url};
 use ipnet::Ipv4Net;
 use localsend::{
-    crypto::{
-        cert::{SelfSignedCert, generate_self_signed},
-        hash::sha256_hex,
-    },
+    crypto::cert::{SelfSignedCert, generate_self_signed},
     discovery::{
         self, DeviceChannel, DeviceIdentity, DiscoveredDevice, DiscoveryConfig, DiscoveryEvent,
         DiscoveryHandle, HttpChannel,
@@ -28,10 +25,7 @@ use localsend::{
         },
         state::ClientInfo,
     },
-    model::{
-        discovery::{DeviceType, PROTOCOL_VERSION_V2, ProtocolType},
-        transfer::FileDto,
-    },
+    model::discovery::{DeviceType, PROTOCOL_VERSION_V2, ProtocolType},
     multicast::MulticastDevice,
     util::interface::InterfaceFilter,
 };
@@ -42,7 +36,6 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 
 const PORT: u16 = 53317;
-const MAX_SIZE: u64 = 16 * 1024 * 1024;
 const HTTPS: ProtocolType = ProtocolType::Https;
 
 // Reuse one TLS identity across sessions in this process.
@@ -58,6 +51,8 @@ pub enum TransferError {
     Pin,
     #[error("Transfer declined")]
     Declined,
+    #[error("Invalid subscription URL")]
+    Subscription,
     #[error("Unsupported file")]
     File,
 }
@@ -87,20 +82,24 @@ pub enum TransferEvent {
         alias: String,
         name: String,
         size: u64,
+        has_subscription: bool,
     },
     Withdrawn {
         id: String,
     },
     Received {
         name: String,
+        url: Option<String>,
     },
 }
 
 type Decision = oneshot::Sender<PrepareUploadDecisionV2>;
 struct Pending {
     id: String,
-    file_id: String,
-    decision: Decision,
+    offer: Offer,
+    decision: Option<Decision>,
+    received_profile: bool,
+    received_url: Option<String>,
 }
 
 struct Inputs {
@@ -291,14 +290,23 @@ impl TransferSession {
 
     pub fn answer(&self, id: String, accept: bool) {
         let mut pending = self.pending.lock().unwrap();
-        if let Some(p) = pending.take_if(|p| p.id == id) {
-            let decision = if accept {
-                PrepareUploadDecisionV2::Accept([p.file_id].into())
-            } else {
-                PrepareUploadDecisionV2::Decline
-            };
-            let _ = p.decision.send(decision);
+        let Some(p) = pending.as_mut().filter(|p| p.id == id) else {
+            return;
+        };
+        let Some(tx) = p.decision.take() else {
+            return;
+        };
+        if accept {
+            let ids = std::iter::once(p.offer.profile_id.clone())
+                .chain(p.offer.url_id.clone())
+                .collect();
+            if tx.send(PrepareUploadDecisionV2::Accept(ids)).is_ok() {
+                return;
+            }
+        } else {
+            let _ = tx.send(PrepareUploadDecisionV2::Decline);
         }
+        pending.take();
     }
 
     pub async fn next_event(&self) -> Result<TransferEvent, TransferError> {
@@ -343,21 +351,23 @@ impl TransferSession {
                     if self.receive_path.is_some()
                         && self.on_lan(&ip.to_string())
                         && pending.is_none()
-                        && files.len() == 1
-                        && let Some((file_id, file)) = files.into_iter().next()
-                        && (1..=MAX_SIZE).contains(&file.size)
+                        && let Some(offer) = Offer::parse(&files)
                     {
-                        *pending = Some(Pending {
+                        let event = TransferEvent::Offer {
                             id: session_id.clone(),
-                            file_id,
-                            decision: decision_tx,
-                        });
-                        return Ok(TransferEvent::Offer {
-                            id: session_id,
                             alias: info.alias,
-                            name: file.file_name,
-                            size: file.size,
+                            name: offer.name.clone(),
+                            size: offer.size,
+                            has_subscription: offer.url_id.is_some(),
+                        };
+                        *pending = Some(Pending {
+                            id: session_id,
+                            offer,
+                            decision: Some(decision_tx),
+                            received_profile: false,
+                            received_url: None,
                         });
+                        return Ok(event);
                     }
                     let _ = decision_tx.send(PrepareUploadDecisionV2::Decline);
                 }
@@ -366,9 +376,41 @@ impl TransferSession {
                     return Ok(TransferEvent::Withdrawn { id: session_id });
                 }
                 ServerEventV2::FileUpload {
-                    target_tx, file, ..
+                    target_tx,
+                    file_id,
+                    session_id,
+                    ..
                 } => {
-                    let path = self.receive_path.clone().ok_or(TransferError::Failed)?;
+                    let is_url = {
+                        let pending = self.pending.lock().unwrap();
+                        let Some(p) = pending
+                            .as_ref()
+                            .filter(|p| p.id == session_id && p.decision.is_none())
+                        else {
+                            continue;
+                        };
+                        if file_id == p.offer.profile_id {
+                            false
+                        } else if p.offer.url_id.as_ref() == Some(&file_id) {
+                            true
+                        } else {
+                            continue;
+                        }
+                    };
+                    let scratch = self.receive_path.as_ref().ok_or(TransferError::Failed)?;
+                    let url_path = if is_url {
+                        let dir = scratch.parent().ok_or(TransferError::Failed)?;
+                        Some(
+                            tempfile::NamedTempFile::new_in(dir)
+                                .map_err(|_| TransferError::Failed)?
+                                .into_temp_path(),
+                        )
+                    } else {
+                        None
+                    };
+                    let path = url_path
+                        .as_ref()
+                        .map_or_else(|| scratch.clone(), |p| p.to_path_buf());
                     let (tx, rx) = oneshot::channel();
                     target_tx
                         .send(FileUploadTarget::Path {
@@ -381,14 +423,44 @@ impl TransferSession {
                         _=self.stop.cancelled()=>return Err(TransferError::Failed),
                         result=rx=>result.map_err(|_|TransferError::Failed)?.map_err(|_|TransferError::Failed)?,
                     }
-                    return Ok(TransferEvent::Received {
-                        name: file.file_name,
-                    });
+                    let url = if let Some(path) = url_path {
+                        Some(subscription_url(
+                            &tokio::fs::read_to_string(&path)
+                                .await
+                                .map_err(|_| TransferError::Subscription)?,
+                        )?)
+                    } else {
+                        None
+                    };
+                    let mut pending = self.pending.lock().unwrap();
+                    let Some(p) = pending.as_mut().filter(|p| p.id == session_id) else {
+                        continue;
+                    };
+                    if is_url {
+                        p.received_url = url;
+                    } else {
+                        p.received_profile = true;
+                    }
+                    if p.received_profile && (p.offer.url_id.is_none() || p.received_url.is_some())
+                    {
+                        let completed = pending.take().unwrap();
+                        return Ok(TransferEvent::Received {
+                            name: completed.offer.name,
+                            url: completed.received_url,
+                        });
+                    }
                 }
-                ServerEventV2::SessionEnd {
-                    session_id,
-                    reason: localsend::http::server::v2::SessionEndReasonV2::Cancelled,
-                } => return Ok(TransferEvent::Withdrawn { id: session_id }),
+                ServerEventV2::SessionEnd { session_id, .. } => {
+                    if self
+                        .pending
+                        .lock()
+                        .unwrap()
+                        .take_if(|p| p.id == session_id)
+                        .is_some()
+                    {
+                        return Ok(TransferEvent::Withdrawn { id: session_id });
+                    }
+                }
                 ServerEventV2::ListenerFailed { .. } => return Err(TransferError::Unavailable),
                 _ => {}
             }
@@ -401,6 +473,7 @@ impl TransferSession {
         path: String,
         name: String,
         pin: Option<String>,
+        url: Option<String>,
     ) -> Result<(), TransferError> {
         let peer = self
             .discovery
@@ -430,18 +503,29 @@ impl TransferSession {
             Some(fingerprint),
             Some(Duration::from_secs(120)),
         )?;
-        let file = FileDto {
-            id: "profile".into(),
-            file_name: name,
-            size: bytes.len() as u64,
-            file_type: "application/yaml".into(),
-            sha256: Some(sha256_hex(&bytes)),
-            preview: None,
-            metadata: None,
-        };
+        let mut parts = Vec::with_capacity(2);
+        if let Some(url) = url {
+            let data = subscription_url(&url)?.into_bytes();
+            parts.push((
+                file_info(
+                    "subscription",
+                    subscription_name(&name),
+                    "text/plain",
+                    &data,
+                ),
+                data,
+            ));
+        }
+        parts.push((
+            file_info("profile", name, "application/yaml", &bytes),
+            bytes,
+        ));
         let request = PrepareUploadRequestDtoV2 {
             info: self.info.clone(),
-            files: HashMap::from([(file.id.clone(), file)]),
+            files: parts
+                .iter()
+                .map(|(f, _)| (f.id.clone(), f.clone()))
+                .collect(),
         };
         let prepared = client
             .prepare_upload(
@@ -456,23 +540,36 @@ impl TransferSession {
             .await?
             .response
             .ok_or(TransferError::Declined)?;
-        let token = prepared
-            .files
-            .get("profile")
-            .ok_or(TransferError::Declined)?;
-        client
-            .upload(
-                HTTPS,
-                &h.host,
-                h.port,
-                None,
-                &prepared.session_id,
-                "profile",
-                token,
-                bytes.into(),
-                self.stop.clone(),
-            )
-            .await?;
+        if !parts
+            .iter()
+            .all(|(file, _)| prepared.files.contains_key(&file.id))
+        {
+            let _ = client
+                .cancel(HTTPS, &h.host, h.port, &prepared.session_id)
+                .await;
+            return Err(TransferError::Declined);
+        }
+        for (file, bytes) in parts {
+            let upload = client
+                .upload(
+                    HTTPS,
+                    &h.host,
+                    h.port,
+                    None,
+                    &prepared.session_id,
+                    &file.id,
+                    &prepared.files[&file.id],
+                    bytes.into(),
+                    self.stop.clone(),
+                )
+                .await;
+            if let Err(error) = upload {
+                let _ = client
+                    .cancel(HTTPS, &h.host, h.port, &prepared.session_id)
+                    .await;
+                return Err(error.into());
+            }
+        }
         Ok(())
     }
 }

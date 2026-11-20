@@ -31,6 +31,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import rs.clash.android.R
 import rs.clash.android.model.Profile
+import rs.clash.android.model.ProfileType
 import rs.clash.android.viewmodel.ProfileTransfer
 
 @Composable
@@ -96,10 +97,12 @@ private fun ProfileTransferDialog(transfer: ProfileTransfer) {
 					if (state.busy || state.address.isEmpty()) LinearProgressIndicator(Modifier.fillMaxWidth())
 					if (offer != null) {
 						Text(stringResource(R.string.lan_offer, offer.alias, offer.name, formatFileSize(offer.size.toLong())))
+						if (offer.hasSubscription) Text(stringResource(R.string.lan_receive_subscription))
 					} else if (state.profile == null) {
 						Text(stringResource(if (state.busy) R.string.lan_receiving else R.string.lan_waiting))
 					} else {
 						Text(state.profile.name)
+						if (state.profile.type == ProfileType.REMOTE) Text(stringResource(R.string.lan_share_subscription))
 						if (state.peers.isEmpty()) Text(stringResource(R.string.lan_discovering))
 						state.peers.forEach { peer ->
 							TextButton(enabled = !state.busy, onClick = { transfer.send(peer, pin) }) {

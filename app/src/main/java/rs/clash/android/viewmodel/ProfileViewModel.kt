@@ -77,6 +77,7 @@ class ProfileViewModel(
 	private suspend fun importReceivedProfile(
 		source: File,
 		offeredName: String,
+		url: String?,
 	): String {
 		// Keep the sender's name out of filesystem paths. Existing local and subscription
 		// imports use filesDir/<display name>, so reserve a separate directory for LAN copies.
@@ -97,6 +98,8 @@ class ProfileViewModel(
 					name = name,
 					filePath = file.absolutePath,
 					fileSize = file.length(),
+					type = if (url == null) ProfileType.LOCAL else ProfileType.REMOTE,
+					url = url,
 					isActive =
 						profiles.isEmpty() && savedFilePath == null,
 				)

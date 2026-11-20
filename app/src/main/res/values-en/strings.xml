@@ -151,7 +151,7 @@
     <string name="profile_next">Next</string>
     <string name="profile_local_description">Choose a Clash configuration file on this device and give it a name to import it.</string>
     <string name="profile_remote_description">Download a profile from a subscription URL. You can update it later using the same URL.</string>
-    <string name="profile_receive_description">Receive a file from another device on the same network. Clash validates it before adding a new local profile. Profiles with the same name are kept separately.</string>
+    <string name="profile_receive_description">Receive a profile on the same network. Clash validates it before import. An included subscription URL makes it a remote profile. Duplicate names are numbered.</string>
     <string name="profile_config_name">Profile Name</string>
     <string name="profile_subscription_url">Subscription URL</string>
     <string name="profile_downloading">Downloading profile...</string>
@@ -194,6 +194,10 @@
     <string name="lan_pin">Receiver PIN (if required)</string>
     <string name="lan_sent">Profile sent.</string>
     <string name="lan_imported">Imported local profile “%1$s”.</string>
+    <string name="lan_share_subscription">Shares the current configuration file and the full subscription URL together.</string>
+    <string name="lan_receive_subscription">Includes a subscription URL. You can update this remote profile manually after import.</string>
+    <string name="lan_imported_remote">Imported remote profile “%1$s” with its subscription URL.</string>
+    <string name="lan_invalid_subscription">Invalid subscription URL. An HTTP or HTTPS URL is required.</string>
     <string name="lan_invalid">Clash rejected the configuration. Nothing was imported.</string>
     <string name="lan_failed">Operation failed. Check the LAN connection and the other device, then retry.</string>
     <string name="lan_size">Choose a profile between 1 byte and 16 MiB.</string>

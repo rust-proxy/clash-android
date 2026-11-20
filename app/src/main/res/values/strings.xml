@@ -131,7 +131,7 @@
     <string name="profile_next">下一步</string>
     <string name="profile_local_description">从本机选择 Clash 配置文件，命名后导入。</string>
     <string name="profile_remote_description">输入订阅链接下载配置，以后可从同一链接更新。</string>
-    <string name="profile_receive_description">接收同一局域网内其他设备分享的文件。Clash 校验通过后会导入为新的本地配置，重名时自动编号。</string>
+    <string name="profile_receive_description">从同一局域网接收配置。Clash 校验通过后导入，附带订阅链接时保存为远程配置，重名时自动编号。</string>
     <string name="profile_config_name">配置名称</string>
     <string name="profile_subscription_url">订阅 URL</string>
     <string name="profile_downloading">正在下载配置...</string>
@@ -193,6 +193,10 @@
     <string name="lan_pin">对方的 PIN（如需要）</string>
     <string name="lan_sent">配置已发送。</string>
     <string name="lan_imported">已导入本地配置「%1$s」。</string>
+    <string name="lan_share_subscription">将同时分享当前配置文件和完整订阅链接。</string>
+    <string name="lan_receive_subscription">附带订阅链接，接收后可手动更新此远程配置。</string>
+    <string name="lan_imported_remote">已导入远程配置「%1$s」并保存订阅链接。</string>
+    <string name="lan_invalid_subscription">订阅链接无效，需要 HTTP 或 HTTPS 链接。</string>
     <string name="lan_invalid">Clash 校验失败，未导入配置。</string>
     <string name="lan_failed">操作失败，请检查局域网连接及对方设备后重试。</string>
     <string name="lan_size">请选择 1 字节至 16 MiB 的配置文件。</string>

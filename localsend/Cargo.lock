@@ -1376,10 +1376,12 @@ version = "0.1.0"
 dependencies = [
  "ipnet",
  "localsend",
+ "tempfile",
  "thiserror",
  "tokio",
  "tokio-util",
  "uniffi",
+ "url",
 ]
 
 [[package]]

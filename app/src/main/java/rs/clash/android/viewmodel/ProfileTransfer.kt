@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import rs.clash.android.R
 import rs.clash.android.model.Profile
+import rs.clash.android.model.ProfileType
 import uniffi.clash_android_ffi.EyreException
 import uniffi.profile_transfer.Peer
 import uniffi.profile_transfer.TransferEvent
@@ -39,7 +40,7 @@ internal data class TransferState(
 internal class ProfileTransfer(
 	private val app: Application,
 	private val scope: CoroutineScope,
-	private val importProfile: suspend (File, String) -> String,
+	private val importProfile: suspend (File, String, String?) -> String,
 ) {
 	var state by mutableStateOf<TransferState?>(null)
 		private set
@@ -61,7 +62,12 @@ internal class ProfileTransfer(
 				} catch (e: CancellationException) {
 					throw e
 				} catch (e: Exception) {
-					val message = if (e is EyreException) R.string.lan_invalid else R.string.lan_failed
+					val message =
+						when (e) {
+							is EyreException -> R.string.lan_invalid
+							is TransferException.Subscription -> R.string.lan_invalid_subscription
+							else -> R.string.lan_failed
+						}
 					state = state?.copy(finished = true, busy = false, offer = null, message = app.getString(message))
 				}
 			}
@@ -113,8 +119,9 @@ internal class ProfileTransfer(
 								}
 							is TransferEvent.Received -> {
 								receiveTimeout?.cancel()
-								val name = importProfile(checkNotNull(scratch), event.name)
-								state = state?.copy(offer = null, busy = false, finished = true, message = app.getString(R.string.lan_imported, name))
+								val name = importProfile(checkNotNull(scratch), event.name, event.url)
+								val message = if (event.url == null) R.string.lan_imported else R.string.lan_imported_remote
+								state = state?.copy(offer = null, busy = false, finished = true, message = app.getString(message, name))
 								break
 							}
 						}
@@ -173,7 +180,8 @@ internal class ProfileTransfer(
 				.trim('.', ' ')
 				.ifEmpty { "profile" }
 		val filename = if (base.endsWith(".yaml", true) || base.endsWith(".yml", true)) base else "$base.yaml"
-		native.send(peer.fingerprint, profile.filePath, filename, pin.ifBlank { null })
+		val url = if (profile.type == ProfileType.REMOTE) profile.url.orEmpty() else null
+		native.send(peer.fingerprint, profile.filePath, filename, pin.ifBlank { null }, url)
 		state = state?.copy(finished = true, message = app.getString(R.string.lan_sent))
 		job?.cancel()
 	}
@@ -193,6 +201,7 @@ internal class ProfileTransfer(
 						is TransferException.Pin -> R.string.lan_pin_required
 						is TransferException.Declined -> R.string.lan_declined
 						is TransferException.File -> R.string.lan_size
+						is TransferException.Subscription -> R.string.lan_invalid_subscription
 						else -> R.string.lan_failed
 					}
 				state = state?.copy(message = app.getString(reason))
