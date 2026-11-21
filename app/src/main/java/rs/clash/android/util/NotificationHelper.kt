@@ -13,7 +13,6 @@ import rs.clash.android.R
 
 object NotificationHelper {
 	private const val CHANNEL_ID = "clash_vpn_service"
-	private const val CHANNEL_NAME = "Clash VPN Service"
 	const val NOTIFICATION_ID = 1
 
 	fun createNotificationChannel(context: Context) {
@@ -21,10 +20,9 @@ object NotificationHelper {
 			val channel =
 				NotificationChannel(
 					CHANNEL_ID,
-					CHANNEL_NAME,
+					context.getString(R.string.proxy_service_channel),
 					NotificationManager.IMPORTANCE_LOW,
 				).apply {
-					description = "Clash VPN 服务运行通知"
 					setShowBadge(false)
 				}
 
@@ -33,7 +31,10 @@ object NotificationHelper {
 		}
 	}
 
-	fun createNotification(context: Context): Notification {
+	fun createNotification(
+		context: Context,
+		root: Boolean,
+	): Notification {
 		createNotificationChannel(context)
 
 		val intent =
@@ -51,8 +52,8 @@ object NotificationHelper {
 
 		return NotificationCompat
 			.Builder(context, CHANNEL_ID)
-			.setContentTitle("Clash VPN")
-			.setContentText("VPN 服务正在运行")
+			.setContentTitle(context.getString(if (root) R.string.mode_tproxy else R.string.stat_vpn))
+			.setContentText(context.getString(R.string.stat_vpn_running))
 			.setSmallIcon(R.drawable.ic_launcher_foreground)
 			.setContentIntent(pendingIntent)
 			.setOngoing(true)

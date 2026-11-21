@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.update
 import rs.clash.android.data.AppData
 import rs.clash.android.data.ConnectionsRepository
 import rs.clash.android.service.VpnController
-import rs.clash.android.service.runningChanges
+import rs.clash.android.service.coreReadyChanges
 import uniffi.clash_android_ffi.Connection
 
 data class ConnectionsUiState(
@@ -33,7 +33,7 @@ class ConnectionsViewModel(
 	suspend fun observe() {
 		try {
 			pollWhileServiceRunning(
-				vpn.runningChanges.onEach { state.value = ConnectionsUiState() },
+				vpn.coreReadyChanges.onEach { state.value = ConnectionsUiState() },
 				intervalMillis = 2000,
 				refresh = ::fetchConnections,
 			)

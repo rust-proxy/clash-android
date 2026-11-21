@@ -9,7 +9,6 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -19,6 +18,7 @@ import rs.clash.android.data.Overview
 import rs.clash.android.data.OverviewRepository
 import rs.clash.android.service.VpnController
 import rs.clash.android.service.VpnStartResult
+import rs.clash.android.service.coreReadyChanges
 import rs.clash.android.service.runningChanges
 
 data class HomeUiState(
@@ -119,7 +119,7 @@ class HomeViewModel(
 	/** The resumed destination owns this collection, including in-flight FFI requests. */
 	suspend fun observe() {
 		pollWhileServiceRunning(
-			vpn.runningChanges.onEach(::updateRunningState),
+			vpn.coreReadyChanges,
 			intervalMillis = 3000,
 			initialDelayMillis = { if (state.value.hasLoadedOverview) 0L else 1000L },
 			refresh = ::refreshOverview,

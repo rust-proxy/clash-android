@@ -42,6 +42,8 @@ import rs.clash.android.formatSize
 @Composable
 internal fun VpnStatusCard(
 	running: Boolean,
+	rootMode: Boolean,
+	starting: Boolean,
 	onClick: () -> Unit,
 	modifier: Modifier = Modifier,
 ) {
@@ -67,12 +69,19 @@ internal fun VpnStatusCard(
 		) {
 			Column(modifier = Modifier.weight(1f)) {
 				Text(
-					text = stringResource(R.string.stat_vpn),
+					text = stringResource(if (rootMode) R.string.mode_tproxy else R.string.stat_vpn),
 					style = MaterialTheme.typography.labelLarge,
 				)
 				Spacer(Modifier.height(6.dp))
 				Text(
-					text = stringResource(if (running) R.string.stat_vpn_running else R.string.stat_vpn_stopped),
+					text =
+						stringResource(
+							when {
+								starting -> R.string.proxy_starting
+								running -> R.string.stat_vpn_running
+								else -> R.string.stat_vpn_stopped
+							},
+						),
 					style = MaterialTheme.typography.headlineLarge,
 					fontWeight = FontWeight.SemiBold,
 				)

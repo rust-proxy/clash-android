@@ -3,135 +3,46 @@ package rs.clash.android.service
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.content.pm.ServiceInfo
 import android.net.VpnService
-import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
-import android.os.Message
-import android.os.Messenger
 import android.os.ParcelFileDescriptor
-import android.os.Process
-import android.os.RemoteException
-import android.util.Log
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import rs.clash.android.diagnostics.ProxyDiagnostics
-import rs.clash.android.util.NotificationHelper
-import uniffi.clash_android_ffi.ClashInstance
 import uniffi.clash_android_ffi.ProfileOverride
 import uniffi.clash_android_ffi.runClash
-import java.io.File
 
 @SuppressLint("VpnServicePolicy")
 class TunService : VpnService() {
-	companion object {
-		internal const val CONFIG = "session_config"
-		internal const val STOP = "rs.clash.android.STOP_VPN"
-		internal const val CORE_READY = 2
-	}
+	private val session = ProxyServiceSession(this, ::runSession)
 
-	private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-	private var started = false
-	private var instance: ClashInstance? = null
-	private var observer: Messenger? = null
-	private val control =
-		Messenger(
-			Handler(Looper.getMainLooper()) { message ->
-				if (message.sendingUid == Process.myUid()) {
-					when (message.what) {
-						ProxySession.SUBSCRIBE -> {
-							observer = message.replyTo
-							sendState()
-						}
-						ProxySession.STOP_FOR_RESTART -> stopSession()
-					}
-				}
-				true
-			},
-		)
-
-	override fun onBind(intent: Intent): IBinder? = if (intent.action == ProxySession.OBSERVE) control.binder else super.onBind(intent)
+	override fun onBind(intent: Intent): IBinder? = session.bind(intent) ?: super.onBind(intent)
 
 	override fun onUnbind(intent: Intent): Boolean {
-		if (intent.action == ProxySession.OBSERVE) observer = null
+		session.unbind(intent)
 		return super.onUnbind(intent)
-	}
-
-	private fun sendState() {
-		try {
-			val status =
-				when {
-					instance != null -> CORE_READY
-					started -> 1
-					else -> 0
-				}
-			observer?.send(Message.obtain(null, ProxySession.STATE, status, instance?.mixedPort()?.toInt() ?: 0))
-		} catch (_: RemoteException) {
-			observer = null
-		}
 	}
 
 	override fun onStartCommand(
 		intent: Intent?,
 		flags: Int,
 		startId: Int,
-	): Int {
-		if (intent?.action == STOP) {
-			stopSession()
-			return START_NOT_STICKY
-		}
-		if (started) return START_STICKY
-		started = true
-		try {
-			val notification = NotificationHelper.createNotification(this)
-			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-				startForeground(NotificationHelper.NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-			} else {
-				startForeground(NotificationHelper.NOTIFICATION_ID, notification)
-			}
-		} catch (e: RuntimeException) {
-			Log.e("clash", "Could not start foreground VPN service", e)
-			stopSession()
-			return START_NOT_STICKY
-		}
-		sendState()
-		scope.launch {
-			try {
-				val config =
-					withContext(Dispatchers.IO) {
-						// Only :proxy reads/writes this snapshot, including on a sticky or always-on restart.
-						val prefs = getSharedPreferences("proxy_session", MODE_PRIVATE)
-						val supplied = intent?.getStringExtra(CONFIG)
-						val saved = supplied ?: prefs.getString(CONFIG, null) ?: error("No saved VPN configuration")
-						val settings = JSONObject(saved)
-						if (supplied != null) check(prefs.edit().putString(CONFIG, supplied).commit())
-						for (name in listOf("Country.mmdb", "geosite.dat")) {
-							assets.open("clash-res/$name").use { input ->
-								File(cacheDir, name).outputStream().use { output -> input.copyTo(output) }
-							}
-						}
-						settings
-					}
-				runSession(config)
-			} catch (e: CancellationException) {
-				throw e
-			} catch (e: Exception) {
-				Log.e("clash", "VPN session failed", e)
-			}
-			stopSession()
-		}
-		return START_STICKY
+	): Int = session.start(intent)
+
+	override fun onRevoke() {
+		Handler(Looper.getMainLooper()).post { session.stop() }
 	}
 
-	private suspend fun runSession(config: JSONObject) {
+	override fun onDestroy() {
+		session.stop()
+		super.onDestroy()
+	}
+
+	private suspend fun runSession(
+		config: JSONObject,
+		ready: (Int) -> Unit,
+	) {
 		val builder =
 			Builder()
 				.setSession("ClashRS VPNService")
@@ -166,38 +77,11 @@ class TunService : VpnService() {
 				ParcelFileDescriptor.adoptFd(fd).close()
 				throw e
 			}
-		instance = clash
-		sendState()
-		clash.awaitStopped()
-	}
-
-	override fun onRevoke() {
-		Handler(Looper.getMainLooper()).post { stopSession() }
-	}
-
-	private fun stopSession() {
-		stopSelf()
-		if (started) releaseProxy()
-	}
-
-	override fun onDestroy() {
-		super.onDestroy()
-		if (started) releaseProxy()
-	}
-
-	private fun releaseProxy() {
-		started = false
-		val clash = instance
-		instance = null
 		try {
-			sendState()
-			scope.cancel()
-			clash?.shutdown()
-			ProxyDiagnostics.markStopped()
+			ready(clash.mixedPort().toInt())
+			clash.awaitStopped()
 		} finally {
-			// Some core tasks outlive shutdown. End only the dedicated proxy process so
-			// its descriptors and native runtime are gone before the next VPN session.
-			Process.killProcess(Process.myPid())
+			clash.shutdown()
 		}
 	}
 }

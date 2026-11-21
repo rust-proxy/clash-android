@@ -60,6 +60,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.annotation.RootGraph
@@ -103,6 +104,8 @@ fun SettingsScreen(
 	modifier: Modifier = Modifier,
 	viewModel: SettingsViewModel = viewModel(),
 ) {
+	val session by viewModel.session.collectAsStateWithLifecycle()
+	var showProxyModes by rememberSaveable { mutableStateOf(false) }
 	var showScaleDialog by rememberSaveable { mutableStateOf(false) }
 	var showDarkModeDialog by remember { mutableStateOf(false) }
 	var showLanguageDialog by remember { mutableStateOf(false) }
@@ -185,6 +188,13 @@ fun SettingsScreen(
 
 			item {
 				SettingsCard {
+					SettingsItem(
+						icon = Icons.Default.Router,
+						title = stringResource(R.string.proxy_mode),
+						subtitle = stringResource(if (viewModel.kernelSuEnabled) R.string.mode_tproxy else R.string.stat_vpn),
+						onClick = { showProxyModes = true },
+					)
+					HorizontalDivider(modifier = Modifier.padding(start = 56.dp))
 					if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
 						!hasNotificationPermission
 					) {
@@ -264,6 +274,35 @@ fun SettingsScreen(
 					}
 				}
 			}
+		}
+
+		if (showProxyModes) {
+			AlertDialog(
+				onDismissRequest = { showProxyModes = false },
+				title = { Text(stringResource(R.string.proxy_mode)) },
+				text = {
+					Column(modifier = Modifier.selectableGroup()) {
+						if (session.running) {
+							Text(stringResource(R.string.proxy_mode_stop_first))
+						} else {
+							Text(stringResource(R.string.tproxy_authorization_hint), style = MaterialTheme.typography.bodyMedium)
+							for (root in listOf(false, true)) {
+								PreferenceOption(
+									text = stringResource(if (root) R.string.mode_tproxy else R.string.stat_vpn),
+									selected = viewModel.kernelSuEnabled == root,
+									onClick = {
+										viewModel.selectKernelSu(root)
+										showProxyModes = false
+									},
+								)
+							}
+						}
+					}
+				},
+				confirmButton = {
+					TextButton(onClick = { showProxyModes = false }) { Text(stringResource(android.R.string.cancel)) }
+				},
+			)
 		}
 
 		if (showScaleDialog) {

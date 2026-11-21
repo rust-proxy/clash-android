@@ -25,7 +25,7 @@ import rs.clash.android.data.AppData
 import rs.clash.android.data.ProxyInfo
 import rs.clash.android.data.ProxyRepository
 import rs.clash.android.service.VpnController
-import rs.clash.android.service.runningChanges
+import rs.clash.android.service.coreReadyChanges
 
 sealed interface ProxyDelay {
 	data object Testing : ProxyDelay
@@ -83,7 +83,7 @@ class PanelViewModel(
 		// Invalidate cached data across VPN sessions, even while this tab is hidden.
 		// This observer does not perform controller requests.
 		viewModelScope.launch {
-			vpn.runningChanges.collect { enabled ->
+			vpn.coreReadyChanges.collect { enabled ->
 				updateRunningState(enabled)
 			}
 		}
@@ -101,7 +101,7 @@ class PanelViewModel(
 
 	/** Hidden/stopped pages have no action subscriber and cancel all outstanding work. */
 	suspend fun observe() {
-		vpn.runningChanges.collectLatest { enabled ->
+		vpn.coreReadyChanges.collectLatest { enabled ->
 			updateRunningState(enabled)
 			if (enabled) {
 				coroutineScope {

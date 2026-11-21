@@ -34,6 +34,8 @@ use url::Host;
 pub mod controller;
 pub mod log;
 mod profile_transfer;
+#[cfg(target_os = "android")]
+mod tproxy;
 mod update;
 pub mod util;
 
@@ -70,6 +72,10 @@ pub struct ProfileOverride {
 
     #[uniffi(default = true)]
     pub ipv6: bool,
+
+    /// Install app-managed, loopback-only TPROXY listeners for this session.
+    #[uniffi(default = None)]
+    pub tproxy_port: Option<u16>,
 }
 
 #[derive(uniffi::Object)]
@@ -244,7 +250,43 @@ async fn run_clash(
         // TPROXY owns no TUN device, even if the shared profile enables one.
         config_def.tun = None;
     }
+    if over.tproxy_port.is_some() {
+        eyre::ensure!(
+            over.tun_fd.is_none(),
+            "Cannot combine TUN and managed TPROXY"
+        );
+        config_def.tproxy_port = None;
+    }
     let mut config = Config::Def(config_def).try_parse()?;
+    if let Some(port) = over.tproxy_port {
+        use clash_lib::config::{
+            config::BindAddress,
+            listener::{CommonInboundOpts, InboundOpts},
+        };
+        eyre::ensure!(port != 0, "Invalid TPROXY port");
+        config
+            .listeners
+            .retain(|opts| !matches!(opts, InboundOpts::TProxy { .. }));
+        for addr in [
+            IpAddr::V4(Ipv4Addr::LOCALHOST),
+            IpAddr::V6(Ipv6Addr::LOCALHOST),
+        ] {
+            if addr.is_ipv6() && !over.ipv6 {
+                continue;
+            }
+            config.listeners.insert(InboundOpts::TProxy {
+                common_opts: CommonInboundOpts {
+                    name: format!("ANDROID-TPROXY-{addr}"),
+                    listen: BindAddress(addr),
+                    port,
+                    allow_lan: true,
+                    fw_mark: None,
+                },
+                udp: true,
+                dns_hijack: true,
+            });
+        }
+    }
     if let Some(fd) = over.tun_fd {
         eyre::ensure!(fd >= 0, "VPN mode requires a valid TUN fd");
         config.tun = TunConfig {

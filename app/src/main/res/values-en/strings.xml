@@ -23,7 +23,7 @@
     <!-- Home Screen -->
     <string name="home_title">Overview</string>
     <string name="refresh">Refresh</string>
-    <string name="no_proxy_groups">No proxy groups found. Is VPN running?</string>
+    <string name="no_proxy_groups">No proxy groups found. Is the proxy running?</string>
     <string name="retry">Retry</string>
     <string name="refreshing">Refreshing...</string>
     <string name="traffic_summary">Network traffic</string>
@@ -35,6 +35,13 @@
     <string name="stat_connections_none">No active sessions</string>
     <string name="stat_download">Total Download</string>
     <string name="stat_upload">Total Upload</string>
+    <string name="proxy_starting">Starting…</string>
+    <string name="proxy_service_channel">Proxy service</string>
+    <string name="proxy_mode">Proxy mode</string>
+    <string name="tproxy_authorization_hint">Grant Clash Android superuser access in KernelSU Manager before starting TPROXY.</string>
+    <string name="mode_tproxy">KernelSU TPROXY</string>
+    <string name="proxy_mode_stop_first">Stop the proxy before changing modes.</string>
+    <string name="tproxy_failed">TPROXY failed. Check superuser access for Clash Android in KernelSU Manager and kernel TPROXY support.</string>
     <string name="stat_vpn">VPN</string>
     <string name="stat_vpn_running">Running</string>
     <string name="stat_vpn_stopped">Stopped</string>
@@ -96,7 +103,7 @@
     <!-- App Selector Screen -->
     <string name="app_selector_title">App Filter</string>
     <string name="app_selector_mode">Filter Mode</string>
-    <string name="app_selector_mode_all">All apps through VPN</string>
+    <string name="app_selector_mode_all">All apps through the proxy</string>
     <string name="app_selector_mode_allowed">Only selected apps</string>
     <string name="app_selector_mode_disallowed">Exclude selected apps</string>
     <string name="app_selector_search">Search apps...</string>
@@ -116,12 +123,12 @@
     
     <!-- TopBar Actions -->
     <string name="action_more">More options</string>
-    <string name="action_exit_ui_keep_vpn">Exit interface, keep VPN running</string>
+    <string name="action_exit_ui_keep_vpn">Exit interface, keep proxy running</string>
     <string name="exit_ui_profile_busy">A profile is downloading or updating. You can exit when it finishes.</string>
     <string name="action_restart">Restart proxy</string>
     <string name="home_restart_failed">Failed to restart proxy: %1$s</string>
     <string name="restart_confirm_title">Restart proxy?</string>
-    <string name="restart_confirm_message">The VPN will reconnect using the current configuration. Existing proxy connections will close.</string>
+    <string name="restart_confirm_message">The proxy will reconnect using the current configuration. Existing proxy connections will close.</string>
     <string name="confirm">Confirm</string>
     <string name="profile_update_proxy_configured">This update will use the configured HTTP proxy: %1$s</string>
     <string name="profile_update_proxy_clash">Clash is running. This update will use its HTTP proxy: %1$s</string>

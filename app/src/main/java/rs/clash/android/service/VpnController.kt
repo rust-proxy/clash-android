@@ -52,7 +52,10 @@ interface VpnController {
 internal val VpnController.runningChanges: Flow<Boolean>
 	get() = session.map { it.running }.distinctUntilChanged()
 
-/** Android permission/service bridge; TunService exclusively owns core and TUN cleanup. */
+internal val VpnController.coreReadyChanges: Flow<Boolean>
+	get() = session.map { it.coreReady }.distinctUntilChanged()
+
+/** Selects the foreground service and requests Android VPN permission only for VPN sessions. */
 internal class AndroidVpnController(
 	private val context: Context,
 ) : VpnController {
@@ -98,9 +101,10 @@ internal class AndroidVpnController(
 		launch: (Intent) -> Unit,
 	): VpnStartResult {
 		if (config == null) return VpnStartResult.MissingProfile
-		val permissionIntent = VpnService.prepare(context)
+		val root = JSONObject(config).optBoolean(KernelSuService.MODE_KEY)
+		val permissionIntent = if (root) null else VpnService.prepare(context)
 		if (permissionIntent != null) return VpnStartResult.PermissionRequired(permissionIntent)
-		launch(Intent(context, TunService::class.java).putExtra(TunService.CONFIG, config))
+		launch(Intent(context, if (root) KernelSuService::class.java else TunService::class.java).putExtra(ProxyServiceSession.CONFIG, config))
 		return VpnStartResult.Started
 	}
 
@@ -117,6 +121,7 @@ internal class AndroidVpnController(
 			}
 		return JSONObject()
 			.put("path", path)
+			.put(KernelSuService.MODE_KEY, prefs.getBoolean(KernelSuService.MODE_KEY, false))
 			.put("mode", mode)
 			.put("apps", JSONArray(apps.orEmpty().sorted()))
 			.put("fakeIp", prefs.getBoolean("fake_ip", false))
@@ -126,6 +131,6 @@ internal class AndroidVpnController(
 
 	override fun stop() {
 		restarting?.cancel()
-		context.startService(Intent(context, TunService::class.java).setAction(TunService.STOP))
+		proxy.stop()
 	}
 }

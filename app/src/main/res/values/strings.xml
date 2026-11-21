@@ -22,7 +22,7 @@
     <!-- Home Screen -->
     <string name="home_title">总览</string>
     <string name="refresh">刷新</string>
-    <string name="no_proxy_groups">未找到代理组。VPN 是否正在运行？</string>
+    <string name="no_proxy_groups">未找到代理组。代理是否正在运行？</string>
     <string name="retry">重试</string>
     <string name="refreshing">正在刷新...</string>
     <string name="traffic_summary">网络流量</string>
@@ -34,6 +34,13 @@
     <string name="stat_connections_none">无活跃会话</string>
     <string name="stat_download">总下载量</string>
     <string name="stat_upload">总上传量</string>
+    <string name="proxy_starting">正在启动…</string>
+    <string name="proxy_service_channel">代理服务</string>
+    <string name="proxy_mode">代理模式</string>
+    <string name="tproxy_authorization_hint">使用 TPROXY 前，请在 KernelSU 管理器的「超级用户」中授权 Clash Android。</string>
+    <string name="mode_tproxy">KernelSU TPROXY</string>
+    <string name="proxy_mode_stop_first">请先停止代理，再切换模式。</string>
+    <string name="tproxy_failed">TPROXY 启动失败。请检查 KernelSU 管理器是否已授权 Clash Android，以及内核是否支持 TPROXY。</string>
     <string name="stat_vpn">VPN</string>
     <string name="stat_vpn_running">运行中</string>
     <string name="stat_vpn_stopped">已停止</string>
@@ -95,7 +102,7 @@
     <!-- App Selector Screen -->
     <string name="app_selector_title">应用过滤</string>
     <string name="app_selector_mode">过滤模式</string>
-    <string name="app_selector_mode_all">全部通过 VPN</string>
+    <string name="app_selector_mode_all">全部通过代理</string>
     <string name="app_selector_mode_allowed">仅选中的应用</string>
     <string name="app_selector_mode_disallowed">排除选中的应用</string>
     <string name="app_selector_search">搜索应用...</string>
@@ -115,12 +122,12 @@
     
     <!-- TopBar Actions -->
     <string name="action_more">更多选项</string>
-    <string name="action_exit_ui_keep_vpn">退出界面，保持 VPN 运行</string>
+    <string name="action_exit_ui_keep_vpn">退出界面，保持代理运行</string>
     <string name="exit_ui_profile_busy">配置下载或更新中，请在完成后退出界面。</string>
     <string name="action_restart">重启代理</string>
     <string name="home_restart_failed">重启代理失败：%1$s</string>
     <string name="restart_confirm_title">重启代理？</string>
-    <string name="restart_confirm_message">将使用当前配置重新连接 VPN，现有代理连接会中断。</string>
+    <string name="restart_confirm_message">将使用当前配置重新连接代理，现有代理连接会中断。</string>
     <string name="confirm">确认</string>
 
     <!-- Profile Screen -->

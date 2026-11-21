@@ -61,6 +61,7 @@ import rs.clash.android.ui.snackbar.SnackbarController.Companion.showMessage
 import rs.clash.android.viewmodel.HomeAction
 import rs.clash.android.viewmodel.HomeEffect
 import rs.clash.android.viewmodel.HomeViewModel
+import rs.clash.android.viewmodel.SettingsViewModel
 
 @Destination<RootGraph>(start = true)
 @OptIn(ExperimentalMaterial3Api::class)
@@ -70,7 +71,9 @@ fun HomeScreen(
 	navigator: DestinationsNavigator,
 	modifier: Modifier = Modifier,
 	viewModel: HomeViewModel = viewModel(),
+	settings: SettingsViewModel = viewModel(),
 ) {
+	val session by settings.session.collectAsStateWithLifecycle()
 	val context = LocalContext.current
 	val activity = LocalActivity.current as? MainActivity
 	var showActions by remember { mutableStateOf(false) }
@@ -176,6 +179,8 @@ fun HomeScreen(
 			download = download,
 			upload = upload,
 			isVpnRunning = isVpnRunning,
+			rootMode = settings.kernelSuEnabled,
+			starting = session.running && !session.coreReady,
 			onVpnToggle = {
 				viewModel.onAction(if (isVpnRunning) HomeAction.StopVpn else HomeAction.StartVpn)
 			},
@@ -198,6 +203,8 @@ fun OverviewTab(
 	onVpnToggle: () -> Unit,
 	modifier: Modifier = Modifier,
 	onConnectionsClick: () -> Unit = {},
+	rootMode: Boolean = false,
+	starting: Boolean = false,
 ) {
 	val wide = windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
 	val trafficColumns = if (windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)) 2 else 1
@@ -207,11 +214,11 @@ fun OverviewTab(
 	) {
 		if (wide) {
 			Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-				VpnStatusCard(running = isVpnRunning, onClick = onVpnToggle, modifier = Modifier.weight(1f))
+				VpnStatusCard(running = isVpnRunning, rootMode = rootMode, starting = starting, onClick = onVpnToggle, modifier = Modifier.weight(1f))
 				TrafficSummary(download, upload, columns = trafficColumns, modifier = Modifier.weight(1f))
 			}
 		} else {
-			VpnStatusCard(running = isVpnRunning, onClick = onVpnToggle)
+			VpnStatusCard(running = isVpnRunning, rootMode = rootMode, starting = starting, onClick = onVpnToggle)
 			TrafficSummary(download, upload, columns = trafficColumns)
 		}
 		OverviewHeading(stringResource(R.string.runtime_details))

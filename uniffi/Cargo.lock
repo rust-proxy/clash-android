@@ -1005,6 +1005,7 @@ dependencies = [
  "hyper-rustls",
  "ipnet",
  "jni",
+ "libc",
  "localsend",
  "mimalloc",
  "once_cell",

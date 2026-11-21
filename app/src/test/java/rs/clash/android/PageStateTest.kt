@@ -78,6 +78,7 @@ class PageStateTest {
 	fun announcingMixedPortPreservesTheInFlightOverviewRequest() =
 		runTest {
 			val vpn = FakeVpn(running = true)
+			vpn.session.value = VpnSessionState(running = true, coreReady = false)
 			val response = CompletableDeferred<Overview>()
 			var requests = 0
 			val home =
@@ -91,10 +92,14 @@ class PageStateTest {
 					vpn,
 				)
 			val observing = backgroundScope.launch { home.observe() }
+			advanceTimeBy(3000)
+			runCurrent()
+			assertEquals(0, requests)
+			vpn.session.value = VpnSessionState(running = true, coreReady = true)
 			advanceTimeBy(1000)
 			runCurrent()
 			assertEquals(1, requests)
-			vpn.session.value = VpnSessionState(running = true, mixedPort = 17890)
+			vpn.session.value = VpnSessionState(running = true, coreReady = true, mixedPort = 17890)
 			runCurrent()
 			response.complete(Overview(connectionCount = 7))
 			runCurrent()
@@ -199,7 +204,7 @@ class PageStateTest {
 			vpn.session.value = VpnSessionState(running = false)
 			runCurrent()
 			assertEquals(HomeUiState(), home.uiState.value)
-			vpn.session.value = VpnSessionState(running = true)
+			vpn.session.value = VpnSessionState(running = true, coreReady = true)
 			runCurrent()
 			assertEquals(HomeUiState(isVpnRunning = true), home.uiState.value)
 			assertEquals(1, calls)
@@ -351,7 +356,7 @@ class PageStateTest {
 			vpn.session.value = VpnSessionState(running = false)
 			runCurrent()
 			assertEquals(PanelUiState(), panel.uiState.value)
-			vpn.session.value = VpnSessionState(running = true)
+			vpn.session.value = VpnSessionState(running = true, coreReady = true)
 			runCurrent()
 			assertTrue(
 				panel.uiState.value.proxies
@@ -665,7 +670,7 @@ class PageStateTest {
 private class FakeVpn(
 	running: Boolean = false,
 ) : VpnController {
-	override val session = MutableStateFlow(VpnSessionState(running))
+	override val session = MutableStateFlow(VpnSessionState(running, coreReady = running))
 	var starts = 0
 	var restarts = 0
 	var stops = 0
