@@ -10,9 +10,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -55,22 +58,36 @@ internal val VpnController.runningChanges: Flow<Boolean>
 internal val VpnController.coreReadyChanges: Flow<Boolean>
 	get() = session.map { it.coreReady }.distinctUntilChanged()
 
-/** Selects the foreground service and requests Android VPN permission only for VPN sessions. */
+/** Routes operations to the native KernelSU session or the Android VPN service. */
 internal class AndroidVpnController(
 	private val context: Context,
 ) : VpnController {
 	private val proxy = ProxySession(context)
 	private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 	private var restarting: Deferred<VpnStartResult>? = null
-	override val session = proxy.state
+	private val native = NativeTproxy(context, scope)
+	override val session =
+		combine(proxy.state, native.state) { vpn, root -> if (root.running) root else vpn }
+			.stateIn(scope, SharingStarted.Eagerly, native.state.value)
 
-	override fun attach() = proxy.attach()
+	override fun attach() {
+		proxy.attach()
+		native.attach()
+	}
 
-	override fun detach() = proxy.detach()
+	override fun detach() {
+		proxy.detach()
+		native.detach()
+	}
 
 	override fun start(): VpnStartResult {
 		if (session.value.running || restarting?.isActive == true) return VpnStartResult.Started
-		return withStartIntent { ContextCompat.startForegroundService(context, it) }
+		val config = sessionConfig() ?: return VpnStartResult.MissingProfile
+		if (JSONObject(config).optBoolean(NativeTproxy.MODE_KEY)) {
+			native.enqueue("start", JSONObject(config))
+			return VpnStartResult.Started
+		}
+		return withStartIntent(config) { ContextCompat.startForegroundService(context, it) }
 	}
 
 	override suspend fun restart(): VpnStartResult {
@@ -85,7 +102,13 @@ internal class AndroidVpnController(
 					var result: VpnStartResult
 					do {
 						config = sessionConfig()
-						result = withStartIntent(config) { proxy.restart(it) }
+						result =
+							if (native.state.value.running && config != null) {
+								native.change("restart", JSONObject(config))
+								VpnStartResult.Started
+							} else {
+								withStartIntent(config) { proxy.restart(it) }
+							}
 					} while (result == VpnStartResult.Started && session.value.running && config != sessionConfig())
 					result
 				} finally {
@@ -97,14 +120,13 @@ internal class AndroidVpnController(
 	}
 
 	private inline fun withStartIntent(
-		config: String? = sessionConfig(),
+		config: String?,
 		launch: (Intent) -> Unit,
 	): VpnStartResult {
 		if (config == null) return VpnStartResult.MissingProfile
-		val root = JSONObject(config).optBoolean(KernelSuService.MODE_KEY)
-		val permissionIntent = if (root) null else VpnService.prepare(context)
+		val permissionIntent = VpnService.prepare(context)
 		if (permissionIntent != null) return VpnStartResult.PermissionRequired(permissionIntent)
-		launch(Intent(context, if (root) KernelSuService::class.java else TunService::class.java).putExtra(ProxyServiceSession.CONFIG, config))
+		launch(Intent(context, TunService::class.java).putExtra(ProxyServiceSession.CONFIG, config))
 		return VpnStartResult.Started
 	}
 
@@ -121,7 +143,7 @@ internal class AndroidVpnController(
 			}
 		return JSONObject()
 			.put("path", path)
-			.put(KernelSuService.MODE_KEY, prefs.getBoolean(KernelSuService.MODE_KEY, false))
+			.put(NativeTproxy.MODE_KEY, prefs.getBoolean(NativeTproxy.MODE_KEY, false))
 			.put("mode", mode)
 			.put("apps", JSONArray(apps.orEmpty().sorted()))
 			.put("fakeIp", prefs.getBoolean("fake_ip", false))
@@ -131,6 +153,10 @@ internal class AndroidVpnController(
 
 	override fun stop() {
 		restarting?.cancel()
-		proxy.stop()
+		if (native.state.value.running) {
+			native.enqueue("stop")
+		} else {
+			context.startService(Intent(context, TunService::class.java).setAction(ProxyServiceSession.STOP))
+		}
 	}
 }

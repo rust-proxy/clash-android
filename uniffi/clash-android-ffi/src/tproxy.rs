@@ -1,30 +1,107 @@
-//! Credentials for the app_process exec that hosts the transparent listener.
-//! No profile or application-writable code is read before the exec.
-#[unsafe(export_name = "Java_rs_clash_android_service_TproxyCore_dropPrivileges")]
-pub extern "system" fn drop_privileges(
-    _env: *mut jni::sys::JNIEnv,
-    _class: jni::sys::jclass,
-    uid: jni::sys::jint,
-) -> jni::sys::jboolean {
-    const CAP_NET_RAW: u32 = 13;
-    const INET_GROUP: libc::gid_t = 3003;
-    // Linux capability ABI v3 has a two-word header and two 32-bit triples.
-    let header = [0x2008_0522u32, 0];
-    let bit = 1u32 << CAP_NET_RAW;
-    let data = [bit, bit, bit, 0, 0, 0];
-    if uid < 10000 {
-        return false;
+//! Native entry point for the TPROXY launcher. App-only APIs that use the
+//! Android platform certificate verifier continue to run in the controller JVM.
+use std::{io::Read, path::PathBuf, time::Duration};
+
+use eyre::Result;
+use serde::Deserialize;
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::UnixListener,
+    time::timeout,
+};
+
+use crate::{ProfileOverride, run_clash};
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Session {
+    path: String,
+    work_dir: String,
+    control: PathBuf,
+    ipv6: bool,
+    fake_ip: bool,
+    tproxy_port: u16,
+}
+
+/// The launcher passes a single JSON document over stdin and calls this once,
+/// after dropping credentials. No Kotlin, JVM or UniFFI marshalling is needed.
+#[unsafe(no_mangle)]
+pub extern "C" fn clash_android_tproxy_main() -> i32 {
+    crate::log::init_logger(tracing_subscriber::filter::LevelFilter::INFO);
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+    let run = || -> Result<()> {
+        let config: Session = serde_json::from_reader(std::io::stdin().take(1024 * 1024))?;
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()?
+            .block_on(serve(config))
+    };
+    match run() {
+        Ok(()) => 0,
+        Err(err) => {
+            tracing::error!("Native TPROXY session ended: {err}");
+            1
+        }
     }
-    let uid = uid as libc::uid_t;
-    // Only this thread survives exec. Keep NET_RAW for IP_TRANSPARENT, with
-    // the application's UID/GID for config, providers and controller files.
-    unsafe {
-        libc::prctl(libc::PR_SET_KEEPCAPS, 1, 0, 0, 0) == 0
-            && libc::setgroups(1, &INET_GROUP) == 0
-            && libc::setresgid(uid, uid, uid) == 0
-            && libc::setresuid(uid, uid, uid) == 0
-            && libc::syscall(libc::SYS_capset, header.as_ptr(), data.as_ptr()) == 0
-            && libc::prctl(47, 2, CAP_NET_RAW, 0, 0) == 0 // PR_CAP_AMBIENT_RAISE
-            && libc::prctl(libc::PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) == 0
+}
+
+async fn serve(config: Session) -> Result<()> {
+    // The one-shot manager serializes launches and checks the old endpoint
+    // before starting us. Remove stale socket files only as the application UID.
+    match std::fs::remove_file(&config.control) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(e.into()),
+        _ => {}
     }
+    let socket = UnixListener::bind(&config.control)?;
+    let result = async {
+        let core = run_clash(
+            config.path,
+            config.work_dir,
+            ProfileOverride {
+                tun_fd: None,
+                allow_lan: false,
+                mixed_port: Some(7890),
+                http_port: None,
+                socks_port: None,
+                fake_ip: config.fake_ip,
+                fake_ip_range: "198.18.0.2/16".into(),
+                ipv6: config.ipv6,
+                tproxy_port: Some(config.tproxy_port),
+            },
+        )
+        .await?;
+        let mut active = false;
+        loop {
+            let (mut peer, _) = tokio::select! {
+                _ = core.await_stopped() => eyre::bail!("Core exited"),
+                conn = socket.accept() => conn?,
+            };
+            let uid = peer.peer_cred()?.uid();
+            if uid != 0 && uid != unsafe { libc::getuid() } {
+                continue;
+            }
+            let Ok(Ok(request)) = timeout(Duration::from_secs(1), peer.read_u8()).await else {
+                continue;
+            };
+            match request {
+                b'A' if uid == 0 => active = true,
+                b'X' if uid == 0 => {
+                    core.shutdown();
+                    timeout(Duration::from_secs(5), core.await_stopped()).await?;
+                    let _ = peer.write_all(b"STOPPED\n").await;
+                    break;
+                }
+                b'?' => {}
+                _ => continue,
+            }
+            let state = if active { "READY" } else { "STARTING" };
+            let reply = format!("{state} {}\n", core.mixed_port());
+            let _ = peer.write_all(reply.as_bytes()).await;
+        }
+        Ok(())
+    }
+    .await;
+    drop(socket);
+    std::fs::remove_file(config.control)?;
+    result
 }

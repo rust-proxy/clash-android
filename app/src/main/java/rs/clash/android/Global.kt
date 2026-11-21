@@ -14,7 +14,7 @@ class Application : AndroidApplication() {
 	internal var nativeTlsReady = false
 		private set
 
-	external fun javaInit(
+	private external fun javaInit(
 		context: Context,
 		panicFile: String?,
 	): Boolean

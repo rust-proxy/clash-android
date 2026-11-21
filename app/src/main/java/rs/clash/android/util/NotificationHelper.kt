@@ -31,10 +31,7 @@ object NotificationHelper {
 		}
 	}
 
-	fun createNotification(
-		context: Context,
-		root: Boolean,
-	): Notification {
+	fun createNotification(context: Context): Notification {
 		createNotificationChannel(context)
 
 		val intent =
@@ -52,7 +49,7 @@ object NotificationHelper {
 
 		return NotificationCompat
 			.Builder(context, CHANNEL_ID)
-			.setContentTitle(context.getString(if (root) R.string.mode_tproxy else R.string.stat_vpn))
+			.setContentTitle(context.getString(R.string.stat_vpn))
 			.setContentText(context.getString(R.string.stat_vpn_running))
 			.setSmallIcon(R.drawable.ic_launcher_foreground)
 			.setContentIntent(pendingIntent)

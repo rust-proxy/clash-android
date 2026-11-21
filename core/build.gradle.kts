@@ -98,3 +98,55 @@ tasks.matching { it.name.matches(Regex("merge.*JniLibFolders")) }.configureEach 
     inputs.dir(rustJniLibsDir)
     dependsOn("cargoBuild")
 }
+
+// The launcher is a PIE executable, so package it as an asset. Only the
+// authorized manager extracts the matching ABI from the installed APK.
+abstract class PackageTproxyLaunchers : DefaultTask() {
+	@get:Inject
+	abstract val execOperations: ExecOperations
+
+	@get:InputFile
+	@get:PathSensitive(PathSensitivity.NONE)
+	abstract val llvmStrip: RegularFileProperty
+
+	@get:InputFiles
+	@get:PathSensitive(PathSensitivity.RELATIVE)
+	abstract val binaries: ConfigurableFileCollection
+
+	@get:OutputDirectory
+	abstract val assets: DirectoryProperty
+
+	@TaskAction
+	fun copyLaunchers() {
+		for (binary in binaries) {
+			val abi = when (binary.parentFile.parentFile.name) {
+				"armv7-linux-androideabi" -> "armeabi-v7a"
+				"aarch64-linux-android" -> "arm64-v8a"
+				"i686-linux-android" -> "x86"
+				"x86_64-linux-android" -> "x86_64"
+				else -> error("Unknown Android target for $binary")
+			}
+			val dest = assets.file("tproxy/$abi/clash-launcher").get().asFile
+			dest.parentFile.mkdirs()
+			execOperations.exec {
+				commandLine(llvmStrip.get().asFile, "--strip-unneeded", "-o", dest, binary)
+			}
+		}
+	}
+}
+val stripTool = androidComponents.sdkComponents.ndkDirectory.map { ndk ->
+	val tool = if (System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) "llvm-strip.exe" else "llvm-strip"
+	ndk.asFile.resolve("toolchains/llvm/prebuilt").listFiles().orEmpty()
+		.map { it.resolve("bin/$tool") }.single { it.isFile }
+}
+
+androidComponents.onVariants { variant ->
+	val pack = tasks.register<PackageTproxyLaunchers>("package${variant.name.replaceFirstChar { it.uppercase() }}TproxyLaunchers") {
+		dependsOn("cargoBuild")
+		llvmStrip.fileProvider(stripTool)
+		for (triple in listOf("armv7-linux-androideabi", "aarch64-linux-android", "i686-linux-android", "x86_64-linux-android")) {
+			binaries.from(layout.projectDirectory.file("../uniffi/target/$triple/release/clash-launcher"))
+		}
+	}
+	variant.sources.assets?.addGeneratedSourceDirectory(pack, PackageTproxyLaunchers::assets)
+}

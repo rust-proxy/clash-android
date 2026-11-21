@@ -12,7 +12,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 import rs.clash.android.data.AppData
 import rs.clash.android.model.UI_SCALE_KEY
-import rs.clash.android.service.KernelSuService
+import rs.clash.android.service.NativeTproxy
 import rs.clash.android.ui.snackbar.SnackbarController
 import rs.clash.android.util.manualUiScale
 
@@ -50,13 +50,13 @@ class SettingsViewModel(
 
 	val session get() = AppData.vpn.session
 
-	var kernelSuEnabled by mutableStateOf(prefs.getBoolean(KernelSuService.MODE_KEY, false))
+	var kernelSuEnabled by mutableStateOf(prefs.getBoolean(NativeTproxy.MODE_KEY, false))
 		private set
 
 	fun selectKernelSu(enabled: Boolean) {
 		if (session.value.running) return
 		kernelSuEnabled = enabled
-		prefs.edit { putBoolean(KernelSuService.MODE_KEY, enabled) }
+		prefs.edit { putBoolean(NativeTproxy.MODE_KEY, enabled) }
 	}
 
 	var fakeIpEnabled: Boolean by mutableStateOf(loadFakeIpEnabled())
@@ -83,7 +83,7 @@ class SettingsViewModel(
 	private val preferenceChangeListener =
 		SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
 			when (key) {
-				KernelSuService.MODE_KEY -> kernelSuEnabled = prefs.getBoolean(key, false)
+				NativeTproxy.MODE_KEY -> kernelSuEnabled = prefs.getBoolean(key, false)
 				"app_filter_mode" -> appFilterMode = loadAppFilterMode()
 				"allowed_apps" -> allowedApps = loadAllowedApps()
 				"disallowed_apps" -> disallowedApps = loadDisallowedApps()

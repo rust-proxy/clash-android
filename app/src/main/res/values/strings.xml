@@ -37,7 +37,7 @@
     <string name="proxy_starting">正在启动…</string>
     <string name="proxy_service_channel">代理服务</string>
     <string name="proxy_mode">代理模式</string>
-    <string name="tproxy_authorization_hint">使用 TPROXY 前，请在 KernelSU 管理器的「超级用户」中授权 Clash Android。</string>
+    <string name="tproxy_authorization_hint">请先在 KernelSU 管理器中授予 Clash Android 超级用户权限。退出或强行停止 App 后，TPROXY 会继续运行。要停止代理，请重新打开 App 并在首页停止。</string>
     <string name="mode_tproxy">KernelSU TPROXY</string>
     <string name="proxy_mode_stop_first">请先停止代理，再切换模式。</string>
     <string name="tproxy_failed">TPROXY 启动失败。请检查 KernelSU 管理器是否已授权 Clash Android，以及内核是否支持 TPROXY。</string>

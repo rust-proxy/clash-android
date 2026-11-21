@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import rs.clash.android.diagnostics.ProxyDiagnostics
 
-/** A UI-process mirror of the started proxy service. Observing never starts or keeps it alive. */
+/** A UI-process mirror of the started VPN service. Observing never starts or keeps it alive. */
 internal class ProxySession(
 	private val context: Context,
 ) {
@@ -34,25 +34,16 @@ internal class ProxySession(
 	val state = snapshot.asStateFlow()
 
 	private var observers = 0
-	private val connections = mutableListOf<Connection>()
-
-	private fun publish() {
-		snapshot.value = connections.firstOrNull { it.report.running }?.report ?: VpnSessionState()
-	}
-
-	fun stop() {
-		val active = connections.firstOrNull { it.report.running } ?: return
-		context.startService(Intent(context, active.type).setAction(ProxyServiceSession.STOP))
-	}
+	private var connection: Connection? = null
 
 	suspend fun restart(intent: Intent) {
-		val binder = connections.firstOrNull { it.report.running }?.binder ?: return
+		val binder = connection?.binder ?: return
 		stopAndAwaitExit(binder)
 		snapshot.value = VpnSessionState()
 		reconnect()
 		ContextCompat.startForegroundService(context, intent)
 		// Binder death can arrive before ActivityManager removes the old process record.
-		// Redeliver an unacknowledged start once. The service ignores it if already started.
+		// Redeliver an unacknowledged start once. TunService ignores it if already started.
 		val ready =
 			withTimeoutOrNull(30_000) {
 				if (withTimeoutOrNull(3_000) { state.first { it.running } } == null) {
@@ -61,7 +52,7 @@ internal class ProxySession(
 				}
 				state.first { it.coreReady || !it.running }.coreReady
 			}
-		check(ready == true) { "Proxy service did not report startup" }
+		check(ready == true) { "VPN service did not report startup" }
 	}
 
 	private suspend fun stopAndAwaitExit(binder: IBinder) {
@@ -76,7 +67,7 @@ internal class ProxySession(
 		}
 		try {
 			Messenger(binder).send(Message.obtain(null, STOP_FOR_RESTART))
-			checkNotNull(withTimeoutOrNull(30_000) { exited.await() }) { "Proxy service did not exit" }
+			checkNotNull(withTimeoutOrNull(30_000) { exited.await() }) { "VPN service did not exit" }
 		} catch (_: DeadObjectException) {
 			// It already exited between registration and the stop request.
 		} finally {
@@ -91,26 +82,22 @@ internal class ProxySession(
 
 	private fun reconnect() {
 		if (observers == 0) return
-		connections.forEach(context::unbindService)
-		connections.clear()
-		for (type in listOf(TunService::class.java, KernelSuService::class.java)) {
-			val client = Connection(type)
-			connections.add(client)
-			context.bindService(Intent(context, type).setAction(OBSERVE), client, 0)
-		}
+		connection?.let(context::unbindService)
+		val client = Connection()
+		connection = client
+		val intent = Intent(context, TunService::class.java).setAction(OBSERVE)
+		// Binding without BIND_AUTO_CREATE also observes subsequent starts.
+		context.bindService(intent, client, 0)
 	}
 
 	fun detach() {
 		if (--observers != 0) return
-		connections.forEach(context::unbindService)
-		connections.clear()
+		connection?.let(context::unbindService)
+		connection = null
 		snapshot.value = VpnSessionState()
 	}
 
-	private inner class Connection(
-		val type: Class<*>,
-	) : ServiceConnection {
-		var report = VpnSessionState()
+	private inner class Connection : ServiceConnection {
 		var binder: IBinder? = null
 			private set
 
@@ -118,14 +105,13 @@ internal class ProxySession(
 			name: ComponentName,
 			service: IBinder,
 		) {
-			if (this !in connections) return
+			if (connection !== this) return
 			binder = service
 			val handler =
 				Handler(Looper.getMainLooper()) { message ->
-					if (this in connections && message.what == STATE) {
+					if (connection === this && message.what == STATE) {
 						val running = message.arg1 != 0
-						report = VpnSessionState(running, message.arg2.takeIf { running && it > 0 }, message.arg1 == ProxyServiceSession.CORE_READY)
-						publish()
+						snapshot.value = VpnSessionState(running, message.arg2.takeIf { running && it > 0 }, message.arg1 == ProxyServiceSession.CORE_READY)
 					}
 					true
 				}
@@ -137,10 +123,9 @@ internal class ProxySession(
 		}
 
 		override fun onServiceDisconnected(name: ComponentName) {
-			if (this !in connections) return
+			if (connection !== this) return
 			ProxyDiagnostics.recover(context, afterDisconnect = true)
-			report = VpnSessionState()
-			publish()
+			snapshot.value = VpnSessionState()
 			reconnect()
 		}
 
