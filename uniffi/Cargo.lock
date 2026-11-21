@@ -1034,7 +1034,7 @@ dependencies = [
 [[package]]
 name = "clash-lib"
 version = "0.10.12"
-source = "git+https://github.com/rust-proxy/clash-rs.git?branch=android#9790660967bde374d4f1713b621d4f9f9a66fb23"
+source = "git+https://github.com/rust-proxy/clash-rs.git?branch=android#6e19e53f9a114a6fd3aa97fb19b4452be5286174"
 dependencies = [
  "aead 0.5.2",
  "aes 0.9.4",
@@ -1061,6 +1061,7 @@ dependencies = [
  "dirs",
  "educe",
  "erased-serde",
+ "etherparse 0.21.0",
  "filetime",
  "flate2",
  "futures",
@@ -1115,7 +1116,7 @@ dependencies = [
  "shadowsocks",
  "smoltcp",
  "sock2proc",
- "socket2 0.6.5",
+ "socket2",
  "ssh-key 0.6.7",
  "tailscale",
  "tar",
@@ -3069,7 +3070,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.6.5",
+ "socket2",
  "tokio",
  "tower-service",
  "tracing",
@@ -3332,7 +3333,7 @@ version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4d40460c0ce33d6ce4b0630ad68ff63d6661961c48b6dba35e5a4d81cfb48222"
 dependencies = [
- "socket2 0.6.5",
+ "socket2",
  "widestring",
  "windows-registry",
  "windows-result 0.4.1",
@@ -3682,7 +3683,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.11.1",
- "socket2 0.6.5",
+ "socket2",
  "thiserror 2.0.21",
  "time",
  "tokio",
@@ -4274,7 +4275,7 @@ dependencies = [
  "pin-project-lite",
  "rustc-hash",
  "rustls",
- "socket2 0.6.5",
+ "socket2",
  "thiserror 2.0.21",
  "tokio",
  "tokio-stream",
@@ -4317,7 +4318,7 @@ checksum = "8d0160422832eea1cc11c34be04ee6d5a046452b0b46cfb14695d55a1f24c954"
 dependencies = [
  "cfg_aliases",
  "libc",
- "socket2 0.6.5",
+ "socket2",
  "tracing",
  "windows-sys 0.61.2",
 ]
@@ -5248,7 +5249,7 @@ dependencies = [
  "quinn-udp 0.5.16",
  "rustc-hash",
  "rustls",
- "socket2 0.6.5",
+ "socket2",
  "thiserror 2.0.21",
  "tokio",
  "tracing",
@@ -5267,7 +5268,7 @@ dependencies = [
  "quinn-udp 0.6.3",
  "rustc-hash",
  "rustls",
- "socket2 0.6.5",
+ "socket2",
  "thiserror 2.0.21",
  "tokio",
  "tracing",
@@ -5298,7 +5299,7 @@ dependencies = [
  "quinn-udp-jls",
  "rustc-hash",
  "rustls-jls",
- "socket2 0.6.5",
+ "socket2",
  "thiserror 2.0.21",
  "tokio",
  "tracing",
@@ -5383,7 +5384,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.6.5",
+ "socket2",
  "tracing",
  "windows-sys 0.61.2",
 ]
@@ -5395,7 +5396,7 @@ source = "git+https://github.com/Tipuch/quinn.git?branch=bbrv3#01b8848dcb321eb17
 dependencies = [
  "cfg_aliases",
  "libc",
- "socket2 0.6.5",
+ "socket2",
  "tracing",
  "windows-sys 0.61.2",
 ]
@@ -5408,7 +5409,7 @@ checksum = "5d5749a7be268ab1c4fb36b2d6011bffb2c692a7d668c0116663289aa2e91b6d"
 dependencies = [
  "cfg_aliases",
  "libc",
- "socket2 0.6.5",
+ "socket2",
  "tracing",
  "windows-sys 0.61.2",
 ]
@@ -6485,7 +6486,7 @@ dependencies = [
  "serde",
  "serde-saphyr",
  "shadowquic-macros",
- "socket2 0.6.5",
+ "socket2",
  "thiserror 2.0.21",
  "time",
  "tokio",
@@ -6536,7 +6537,7 @@ dependencies = [
  "serde_json",
  "serde_urlencoded",
  "shadowsocks-crypto",
- "socket2 0.6.5",
+ "socket2",
  "spin 0.12.3",
  "thiserror 2.0.21",
  "tokio",
@@ -6751,16 +6752,6 @@ dependencies = [
  "sysctl",
  "tracing",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "socket2"
-version = "0.4.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f7916fc008ca5542385b89a3d3ce689953c143e9304a9bf8beec1de48994c0d"
-dependencies = [
- "libc",
- "winapi",
 ]
 
 [[package]]
@@ -7265,7 +7256,7 @@ dependencies = [
  "parking_lot",
  "pin-project-lite",
  "signal-hook-registry",
- "socket2 0.6.5",
+ "socket2",
  "tokio-macros",
  "tracing",
  "windows-sys 0.61.2",
@@ -7315,7 +7306,7 @@ dependencies = [
  "log",
  "once_cell",
  "pin-project",
- "socket2 0.6.5",
+ "socket2",
  "tokio",
  "windows-sys 0.60.2",
 ]
@@ -7431,7 +7422,7 @@ dependencies = [
  "hyper-util",
  "percent-encoding",
  "pin-project",
- "socket2 0.6.5",
+ "socket2",
  "sync_wrapper",
  "tokio",
  "tokio-stream",
@@ -7907,7 +7898,7 @@ dependencies = [
  "regex",
  "rtnetlink 0.21.0",
  "smallvec",
- "socket2 0.6.5",
+ "socket2",
  "static_assertions",
  "tokio",
  "tokio-stream",
@@ -8427,15 +8418,15 @@ dependencies = [
 
 [[package]]
 name = "unix-udp-sock"
-version = "0.7.0"
-source = "git+https://github.com/Watfaq/unix-udp-sock.git?rev=847c80b519f0fd8cff5c887ae708429897d08671#847c80b519f0fd8cff5c887ae708429897d08671"
+version = "0.9.0-alpha"
+source = "git+https://github.com/Watfaq-legacy/unix-udp-sock.git?rev=1dbc471f32f594ea89faedaf64b5bfed529e3810#1dbc471f32f594ea89faedaf64b5bfed529e3810"
 dependencies = [
  "bytes",
  "futures-core",
  "futures-sink",
  "libc",
  "pin-project-lite",
- "socket2 0.4.10",
+ "socket2",
  "tokio",
  "tokio-util",
  "tracing",
@@ -8624,7 +8615,7 @@ dependencies = [
 [[package]]
 name = "watfaq-dns"
 version = "0.10.12"
-source = "git+https://github.com/rust-proxy/clash-rs.git?branch=android#9790660967bde374d4f1713b621d4f9f9a66fb23"
+source = "git+https://github.com/rust-proxy/clash-rs.git?branch=android#6e19e53f9a114a6fd3aa97fb19b4452be5286174"
 dependencies = [
  "async-trait",
  "futures",
@@ -8643,7 +8634,7 @@ dependencies = [
 [[package]]
 name = "watfaq-netstack"
 version = "0.1.4"
-source = "git+https://github.com/rust-proxy/clash-rs.git?branch=android#9790660967bde374d4f1713b621d4f9f9a66fb23"
+source = "git+https://github.com/rust-proxy/clash-rs.git?branch=android#6e19e53f9a114a6fd3aa97fb19b4452be5286174"
 dependencies = [
  "bytes",
  "etherparse 0.21.0",
@@ -8764,7 +8755,7 @@ dependencies = [
  "quinn 0.12.0",
  "rand 0.10.3",
  "serde",
- "socket2 0.6.5",
+ "socket2",
  "tokio",
  "tokio-util",
  "tracing",
@@ -8829,7 +8820,7 @@ dependencies = [
  "secrecy",
  "serde",
  "snafu",
- "socket2 0.6.5",
+ "socket2",
  "thiserror 2.0.21",
  "tokio",
  "tokio-rustls",

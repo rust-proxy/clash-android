@@ -71,6 +71,7 @@ features = [
     "shadowquic",
     "shadowsocks",
     "tun",
+    "tproxy",
     "wireguard",
     "tailscale",
     "ssh",
