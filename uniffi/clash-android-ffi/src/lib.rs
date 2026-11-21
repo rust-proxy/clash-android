@@ -48,13 +48,16 @@ pub fn format_eyre_error(err: &EyreError) -> String {
 
 #[derive(uniffi::Record)]
 pub struct ProfileOverride {
-    pub tun_fd: i32,
+    /// The VPN service's detached TUN fd. Omit it to use the profile's TPROXY listener.
+    #[uniffi(default = None)]
+    pub tun_fd: Option<i32>,
 
     #[uniffi(default = false)]
     pub allow_lan: bool,
 
-    #[uniffi(default = 7890)]
-    pub mixed_port: u16,
+    /// Fallback when the profile has no mixed port. VPN mode defaults to 7890.
+    #[uniffi(default = None)]
+    pub mixed_port: Option<u16>,
     #[uniffi(default = None)]
     pub http_port: Option<u16>,
     #[uniffi(default = None)]
@@ -79,7 +82,7 @@ pub struct ClashInstance {
 
 #[uniffi::export(async_runtime = "tokio")]
 impl ClashInstance {
-    /// The mixed HTTP/SOCKS port the proxy is listening on
+    /// The configured mixed HTTP/SOCKS port, or zero when none is configured.
     pub fn mixed_port(&self) -> u16 {
         self.mixed_port
     }
@@ -229,23 +232,42 @@ async fn run_clash(
 ) -> Result<Arc<ClashInstance>, EyreError> {
     std::env::set_current_dir(&work_dir)?;
     let mut config_def = ConfigDef::try_from(PathBuf::from(config_path.clone()))?;
-    let mixed_port = config_def.mixed_port.get_or_insert(Port(over.mixed_port)).0;
+    let mixed_port = config_def
+        .mixed_port
+        .or(over.mixed_port.map(Port))
+        .or_else(|| over.tun_fd.map(|_| Port(7890)));
+    config_def.mixed_port = mixed_port;
     config_def.port = config_def.port.or_else(|| over.http_port.map(Port));
     config_def.socks_port = config_def.socks_port.or_else(|| over.socks_port.map(Port));
 
+    if over.tun_fd.is_none() {
+        // TPROXY owns no TUN device, even if the shared profile enables one.
+        config_def.tun = None;
+    }
     let mut config = Config::Def(config_def).try_parse()?;
-    config.tun = TunConfig {
-        enable: true,
-        device_id: format!("fd://{}", over.tun_fd),
-        route_all: false,
-        routes: Vec::new(),
-        gateway: ipnet::Ipv4Net::new(Ipv4Addr::new(10, 0, 0, 1), 30)?,
-        gateway_v6: None,
-        mtu: None,
-        so_mark: None,
-        route_table: 0,
-        dns_hijack: true,
-    };
+    if let Some(fd) = over.tun_fd {
+        eyre::ensure!(fd >= 0, "VPN mode requires a valid TUN fd");
+        config.tun = TunConfig {
+            enable: true,
+            device_id: format!("fd://{fd}"),
+            route_all: false,
+            routes: Vec::new(),
+            gateway: ipnet::Ipv4Net::new(Ipv4Addr::new(10, 0, 0, 1), 30)?,
+            gateway_v6: None,
+            mtu: None,
+            so_mark: None,
+            route_table: 0,
+            dns_hijack: true,
+        };
+    } else {
+        eyre::ensure!(
+            config.listeners.iter().any(|listener| matches!(
+                listener,
+                clash_lib::config::listener::InboundOpts::TProxy { .. }
+            )) || !config.inbound_providers.is_empty(),
+            "TPROXY mode requires tproxy-port or a TPROXY listener in the profile or an inbound provider"
+        );
+    }
 
     config.general.geosite = Some("geosite.dat".to_string());
     config.general.mmdb = Some("Country.mmdb".to_string());
@@ -342,7 +364,7 @@ async fn run_clash(
         config.dns.enhance_mode = DNSMode::Normal;
     }
 
-    info!("Config path: {config_path}\n\tTUN fd: {}", over.tun_fd);
+    info!(config_path, tun_fd = ?over.tun_fd, "Starting Android core");
 
     let cancel_token = CancellationToken::new();
     let token = cancel_token.clone();
@@ -370,7 +392,7 @@ async fn run_clash(
     });
 
     Ok(Arc::new(ClashInstance {
-        mixed_port,
+        mixed_port: mixed_port.map_or(0, |port| port.0),
         cancel_token,
         stopped,
         _handle: Some(handle),
