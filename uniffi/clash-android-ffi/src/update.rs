@@ -125,7 +125,7 @@ async fn write_verified_apk(
         }
     }
     output.flush().await?;
-    Ok(downloaded == size && format!("{:x}", digest.finalize()) == sha256)
+    Ok(downloaded == size && hex::encode(digest.finalize()) == sha256)
 }
 
 #[cfg(test)]

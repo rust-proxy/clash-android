@@ -32,6 +32,7 @@ tracing-subscriber = { version = "0.3", default-features = false, features = ["s
 paranoid-android = "0.2"
 color-eyre = "0.6"
 bytes = "1"
+hex = "0.4"
 sha2 = "0.11"
 
 ipnet = "2"
