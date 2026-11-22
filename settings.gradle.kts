@@ -18,3 +18,4 @@ plugins {
 rootProject.name = "clash-android"
 include(":app")
 include(":core")
+include(":traffic-test")

@@ -1,0 +1,22 @@
+<resources>
+    <string name="app_name">Traffic Test</string>
+    <string name="echo_address">Echo server IP</string>
+    <string name="port">Port</string>
+    <string name="dns_name">DNS lookup domain</string>
+    <string name="run_all">Run all tests</string>
+    <string name="running">Testing…</string>
+    <string name="pending">Ready</string>
+    <string name="passed">Passed · %1$d ms</string>
+    <string name="failed">Failed · %1$d ms</string>
+    <string name="tcp">TCP Echo</string>
+    <string name="udp">UDP Echo</string>
+    <string name="dns">System DNS</string>
+    <string name="verified_echo">Echo verified · %1$s</string>
+    <string name="timeout">No complete response within 5 seconds</string>
+    <string name="invalid_address">Enter a valid IPv4 or IPv6 address</string>
+    <string name="invalid_port">Enter a port between 1 and 65535</string>
+    <string name="invalid_domain">Enter a domain name to resolve</string>
+    <string name="early_eof">TCP connection closed before the full reply arrived</string>
+    <string name="echo_mismatch">Reply differs from the sent payload</string>
+    <string name="no_addresses">DNS returned no addresses</string>
+</resources>

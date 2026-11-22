@@ -43,6 +43,17 @@
 
 每次修改 Rust 部分后使用 `generate-bindings` 更新绑定。
 
+## 在模拟器测试代理流量
+
+`traffic-test` 是可与 Clash Android 同时安装的测试应用，包名为 `rs.clash.traffictest`，支持 Android 10 及以上。它通过普通应用的默认网络发送 TCP、UDP 和系统 DNS 请求。
+
+1. 在仓库根目录执行 `.\gradlew.bat :traffic-test:installDebug`，将「流量测试」安装到已连接的模拟器。
+2. 在宿主机执行 `python traffic-test/echo_server.py`（Python 3.8+），保持终端打开。服务同时监听 `127.0.0.1:39007` 的 TCP 和 UDP。应用默认目标为 Android Studio 模拟器访问宿主机的地址 `10.0.2.2:39007`。
+3. 关闭 VPN，在「流量测试」点击「运行全部测试」取得直连结果。Android 17 及以上访问本地服务时允许本地网络权限。每轮 TCP 和 UDP 各发送一个新编号，界面和服务端终端会显示对应编号。DNS 使用 Android 系统解析器，跳过设备 DNS 缓存，显示返回的 IP 地址。每项超时为 5 秒。
+4. 在 Clash Android 的应用过滤设置中将测试应用纳入代理范围，启动代理后再次运行。要验证具体出站节点，可在**该节点能访问的机器**上运行 `python traffic-test/echo_server.py --bind <监听IP> --port 39007`，把应用目标改成服务端 IP，并让 Clash 规则将它转发到待测节点。确保 TCP 和 UDP 端口均可达。
+
+回包通过表示本次请求获得了预期响应。确认出站路径时，对照服务端的请求编号、来源地址和 Clash 的规则或节点日志。`10.0.2.2` 适合宿主机直连基线，远端代理需要其自身可达的目标。DNS 结果反映当前解析配置，开启 Fake IP 时可能显示合成地址。
+
 # Requirements
 
 Android SDK & NDK
