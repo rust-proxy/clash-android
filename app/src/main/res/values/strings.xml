@@ -72,6 +72,8 @@
     <string name="ui_scale_percent">%1$d%%</string>
     <string name="settings_language">语言</string>
     <string name="settings_general">常规</string>
+    <string name="settings_allow_lan">允许局域网连接</string>
+    <string name="settings_allow_lan_desc">允许同一局域网的设备使用本机的 HTTP、SOCKS 和混合代理端口。</string>
     <string name="settings_fake_ip">启用 Fake IP</string>
     <string name="settings_fake_ip_desc">使用虚拟 IP 地址进行 DNS 解析，提高性能</string>
     <string name="settings_ipv6">启用 IPv6</string>

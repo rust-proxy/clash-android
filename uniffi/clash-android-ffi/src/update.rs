@@ -6,7 +6,7 @@ use tokio::io::{AsyncWrite, AsyncWriteExt};
 use tokio_stream::{Stream, StreamExt};
 
 use crate::EyreError;
-use crate::util::{DownloadProgress, DownloadProgressCallback, download_client};
+use crate::download::{DownloadProgress, DownloadProgressCallback, download_client};
 
 const MANIFEST_LIMIT: usize = 64 * 1024;
 

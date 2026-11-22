@@ -22,9 +22,9 @@ fn proxy_path(name: &str) -> Result<String, EyreError> {
     Ok(format!("/proxies/{}", encode(name)))
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, uniffi::Enum)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum Mode {
+enum Mode {
     Rule,
     Global,
     Direct,
@@ -155,12 +155,9 @@ impl From<OverviewSnapshot> for OverviewResponse {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
-pub struct ConfigResponse {
-    #[serde(rename = "external-controller")]
-    pub external_controller: Option<String>,
-    pub secret: Option<String>,
-    pub mode: Option<Mode>,
+#[derive(Debug, Deserialize)]
+struct ConfigResponse {
+    mode: Option<Mode>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -274,11 +271,6 @@ impl ClashController {
         self.request(Method::GET, &path, None).await
     }
 
-    /// Get memory statistics.
-    pub async fn get_memory(&self) -> Result<MemoryResponse, EyreError> {
-        self.request(Method::GET, "/memory", None).await
-    }
-
     /// Get active connections
     pub async fn get_connections(&self) -> Result<ConnectionsResponse, EyreError> {
         tokio::time::timeout(
@@ -302,40 +294,14 @@ impl ClashController {
         .wrap_err("Overview statistics request timed out")??;
         Ok(snapshot.into())
     }
-
-    /// Get current configuration
-    pub async fn get_configs(&self) -> Result<ConfigResponse, EyreError> {
-        self.request(Method::GET, "/configs", None).await
-    }
-
-    /// Update configuration
-    pub async fn update_config(&self, config: HashMap<String, String>) -> Result<(), EyreError> {
-        let body_bytes = serde_json::to_vec(&config).wrap_err("Failed to serialize config")?;
-
-        self.request_no_response(Method::PATCH, "/configs", Some(body_bytes))
-            .await
-    }
-
-    /// Set proxy mode (rule, global, direct)
-    pub async fn set_mode(&self, mode: Mode) -> Result<(), EyreError> {
-        let mode_str = match mode {
-            Mode::Rule => "rule",
-            Mode::Global => "global",
-            Mode::Direct => "direct",
-        };
-        let mut config = HashMap::new();
-        config.insert("mode".to_string(), mode_str.to_string());
-        self.update_config(config).await
-    }
-
-    /// Get current proxy mode
-    pub async fn get_mode(&self) -> Result<Option<Mode>, EyreError> {
-        let config = self.get_configs().await?;
-        Ok(config.mode)
-    }
 }
 
 impl ClashController {
+    async fn get_mode(&self) -> Result<Option<Mode>, EyreError> {
+        let config: ConfigResponse = self.request(Method::GET, "/configs", None).await?;
+        Ok(config.mode)
+    }
+
     #[cfg(unix)]
     async fn do_request(
         &self,

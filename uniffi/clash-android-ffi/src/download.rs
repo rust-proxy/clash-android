@@ -27,16 +27,6 @@ pub trait DownloadProgressCallback: Send + Sync {
 }
 
 #[uniffi::export(async_runtime = "tokio")]
-pub async fn download_file(
-    url: String,
-    output_path: String,
-    user_agent: Option<String>,
-    proxy_url: Option<String>,
-) -> Result<DownloadResult, EyreError> {
-    download_file_with_progress(url, output_path, user_agent, proxy_url, None).await
-}
-
-#[uniffi::export(async_runtime = "tokio")]
 pub async fn download_file_with_progress(
     url: String,
     output_path: String,
@@ -95,7 +85,7 @@ async fn install_subscription(
     let path = staged
         .to_str()
         .ok_or_else(|| eyre::eyre!("Invalid subscription path"))?;
-    if let Err(error) = crate::verify_config(path) {
+    if let Err(error) = crate::android_config::verify_config(path) {
         return Ok(SubscriptionUpdate::InvalidConfig {
             detail: error.to_string(),
         });

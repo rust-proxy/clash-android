@@ -73,6 +73,8 @@
     <string name="ui_scale_percent">%1$d%%</string>
     <string name="settings_language">Language</string>
     <string name="settings_general">General</string>
+    <string name="settings_allow_lan">Allow LAN connections</string>
+    <string name="settings_allow_lan_desc">Let devices on the local network use this device’s HTTP, SOCKS, and mixed proxy ports.</string>
     <string name="settings_fake_ip">Enable Fake IP</string>
     <string name="settings_fake_ip_desc">Use virtual IP addresses for DNS resolution to improve performance</string>
     <string name="settings_ipv6">Enable IPv6</string>

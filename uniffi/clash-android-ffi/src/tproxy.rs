@@ -17,7 +17,7 @@ use tokio::{
     time::timeout,
 };
 
-use crate::{ProfileOverride, start_android_core};
+use crate::{android_config::ProfileOverride, instance::start_android_core};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,6 +27,8 @@ struct Session {
     control: PathBuf,
     ipv6: bool,
     fake_ip: bool,
+    #[serde(default)]
+    allow_lan: bool,
     tproxy_port: u16,
     tcp_dns_port: Option<u16>,
 }
@@ -124,7 +126,7 @@ async fn serve(config: Session) -> Result<()> {
             config.work_dir,
             ProfileOverride {
                 tun_fd: None,
-                allow_lan: false,
+                allow_lan: config.allow_lan,
                 mixed_port: Some(7890),
                 http_port: None,
                 socks_port: None,

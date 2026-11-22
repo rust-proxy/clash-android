@@ -70,7 +70,11 @@ class TunService : VpnService() {
 		// when runClash fails before spawning the native task.
 		val clash =
 			try {
-				runClash(path, cacheDir.path, ProfileOverride(fd, fakeIp = fakeIp, ipv6 = ipv6))
+				runClash(
+					path,
+					cacheDir.path,
+					ProfileOverride(fd, allowLan = config.optBoolean("allowLan"), fakeIp = fakeIp, ipv6 = ipv6),
+				)
 			} catch (e: CancellationException) {
 				throw e
 			} catch (e: Exception) {

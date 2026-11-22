@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.DisplaySettings
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lan
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Router
@@ -211,6 +212,14 @@ fun SettingsScreen(
 						HorizontalDivider(modifier = Modifier.padding(start = 56.dp))
 					}
 
+					SettingsSwitchItem(
+						icon = Icons.Default.Lan,
+						title = stringResource(R.string.settings_allow_lan),
+						subtitle = stringResource(R.string.settings_allow_lan_desc),
+						checked = viewModel.allowLan,
+						onCheckedChange = viewModel::updateAllowLan,
+					)
+					HorizontalDivider(modifier = Modifier.padding(start = 56.dp))
 					SettingsSwitchItem(
 						icon = Icons.Default.Dns,
 						title = stringResource(R.string.settings_fake_ip),

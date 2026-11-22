@@ -100,7 +100,7 @@ async fn rejects_redirects_and_http_errors_without_parsing_the_body() {
         let (_dir, controller, listener) = endpoint();
         let response =
             format!("HTTP/1.1 {status}\r\nLocation: /other\r\nContent-Length: 3\r\n\r\nbad");
-        let (result, _) = tokio::join!(controller.get_configs(), reply_once(listener, &response));
+        let (result, _) = tokio::join!(controller.get_mode(), reply_once(listener, &response));
         assert_eq!(
             result.unwrap_err().to_string(),
             format!("HTTP status error: {status}")
@@ -116,7 +116,7 @@ async fn distinguishes_invalid_json_from_a_truncated_body() {
     ] {
         let (_dir, controller, listener) = endpoint();
         let response = format!("HTTP/1.1 200 OK\r\nContent-Length: {length}\r\n\r\nbad");
-        let (result, _) = tokio::join!(controller.get_configs(), reply_once(listener, &response));
+        let (result, _) = tokio::join!(controller.get_mode(), reply_once(listener, &response));
         assert_eq!(result.unwrap_err().to_string(), expected);
     }
 }
@@ -133,7 +133,7 @@ async fn missing_socket_is_a_transport_error() {
             .into(),
     );
     assert_eq!(
-        controller.get_configs().await.unwrap_err().to_string(),
+        controller.get_mode().await.unwrap_err().to_string(),
         "HTTP request failed"
     );
 }

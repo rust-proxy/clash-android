@@ -72,6 +72,9 @@ class SettingsViewModel(
 	var fakeIpEnabled: Boolean by mutableStateOf(loadFakeIpEnabled())
 		private set
 
+	var allowLan by mutableStateOf(prefs.getBoolean("allow_lan", false))
+		private set
+
 	var ipv6Enabled: Boolean by mutableStateOf(loadIpv6Enabled())
 		private set
 
@@ -172,6 +175,13 @@ class SettingsViewModel(
 		if (fakeIpEnabled == enabled) return
 		fakeIpEnabled = enabled
 		prefs.edit { putBoolean("fake_ip", enabled) }
+		restartProxy()
+	}
+
+	fun updateAllowLan(enabled: Boolean) {
+		if (allowLan == enabled) return
+		allowLan = enabled
+		prefs.edit { putBoolean("allow_lan", enabled) }
 		restartProxy()
 	}
 

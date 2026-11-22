@@ -11,8 +11,10 @@ Android 安装包支持 `arm64-v8a`、`armeabi-v7a` 和 `x86_64`。通用 APK �
 - [x] 从订阅链接导入配置，手动更新订阅
 - [ ] 在后台定时更新订阅
 - [x] 通过 LocalSend 在局域网收发配置，可随配置分享订阅链接
-- [x] 设置 IPv6、Fake IP、深色模式和界面缩放
+- [x] 设置 IPv6、Fake IP、局域网代理访问、深色模式和界面缩放
 - [x] 在应用内检查、下载并安装 GitHub 稳定版或测试版更新
+
+「设置 → 常规 → 允许局域网连接」控制其他设备能否使用本机的 HTTP、SOCKS 和混合代理端口。开关默认关闭，覆盖配置文件顶层的 `allow-lan`。开启后仍使用配置的 `bind-address`，绑定回环地址时仅本机可用。VPN 和 KernelSU TPROXY 运行时切换此项会重启当前代理。
 
 ## 使用 KernelSU TPROXY
 

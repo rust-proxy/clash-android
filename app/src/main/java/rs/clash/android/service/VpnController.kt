@@ -138,6 +138,7 @@ internal class AndroidVpnController(
 			JSONObject()
 				.put("path", path)
 				.put("fakeIp", prefs.getBoolean("fake_ip", false))
+				.put("allowLan", prefs.getBoolean("allow_lan", false))
 				.put("ipv6", prefs.getBoolean("ipv6", true))
 		if (prefs.getBoolean(NativeTproxy.MODE_KEY, false)) {
 			return config
