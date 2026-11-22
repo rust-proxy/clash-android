@@ -1035,7 +1035,7 @@ dependencies = [
 [[package]]
 name = "clash-lib"
 version = "0.10.12"
-source = "git+https://github.com/rust-proxy/clash-rs.git?branch=android#2da6f42721e6b070bb0646d7368595743939cced"
+source = "git+https://github.com/rust-proxy/clash-rs.git?branch=android#f6ea61b94a7c0dacec166dbafd712553328bf8b4"
 dependencies = [
  "aead 0.5.2",
  "aes 0.9.4",
@@ -8600,7 +8600,7 @@ dependencies = [
 [[package]]
 name = "watfaq-dns"
 version = "0.10.12"
-source = "git+https://github.com/rust-proxy/clash-rs.git?branch=android#2da6f42721e6b070bb0646d7368595743939cced"
+source = "git+https://github.com/rust-proxy/clash-rs.git?branch=android#f6ea61b94a7c0dacec166dbafd712553328bf8b4"
 dependencies = [
  "async-trait",
  "futures",
@@ -8619,7 +8619,7 @@ dependencies = [
 [[package]]
 name = "watfaq-netstack"
 version = "0.1.4"
-source = "git+https://github.com/rust-proxy/clash-rs.git?branch=android#2da6f42721e6b070bb0646d7368595743939cced"
+source = "git+https://github.com/rust-proxy/clash-rs.git?branch=android#f6ea61b94a7c0dacec166dbafd712553328bf8b4"
 dependencies = [
  "bytes",
  "etherparse 0.21.0",
