@@ -117,7 +117,7 @@ internal object TproxyManager {
 			while (true) {
 				check(runCatching { child.exitValue() }.isFailure) { "Native launcher exited" }
 				val status = TproxySocket.request(control, uid)
-				if (status != null && listening(status.pid, config.getBoolean("ipv6"))) break
+				if (status != null && listening(status, config)) break
 				check(SystemClock.elapsedRealtime() < deadline) { "Transparent listeners did not start" }
 				Thread.sleep(100)
 			}
@@ -135,10 +135,10 @@ internal object TproxyManager {
 
 	// Verify the socket inode belongs to this core, even if another app owns the same port.
 	private fun listening(
-		pid: Int,
-		ipv6: Boolean,
+		status: NativeStatus,
+		config: JSONObject,
 	): Boolean {
-		val proc = File("/proc/$pid")
+		val proc = File("/proc/${status.pid}")
 		val sockets =
 			File(proc, "fd")
 				.listFiles()
@@ -146,20 +146,36 @@ internal object TproxyManager {
 				.mapNotNull {
 					runCatching { android.system.Os.readlink(it.path) }.getOrNull()
 				}.toSet()
-		val port = ":%04X".format(java.util.Locale.ROOT, TproxySocket.PORT)
+		val ipv6 = config.getBoolean("ipv6")
+		val systemDns = config.getBoolean("systemDns")
+		val backend = status.tcpDnsBackend
+		if (systemDns && backend == null) return false
 		val protocols = if (ipv6) listOf("tcp", "udp", "tcp6", "udp6") else listOf("tcp", "udp")
-		return protocols.all { protocol ->
-			// /proc/net prints each address word in host byte order.
-			val address = if (protocol.endsWith("6")) "00000000000000000000000001000000" else "0100007F"
+		val expected = mutableMapOf<String, MutableSet<String>>()
+		for (protocol in protocols) {
+			val loopback = if (protocol.endsWith("6")) "00000000000000000000000001000000" else "0100007F"
+			val endpoints = expected.getOrPut(protocol) { mutableSetOf() }
+
+			fun endpoint(port: Int) = "%s:%04X".format(java.util.Locale.ROOT, loopback, port)
+
+			endpoints.add(endpoint(TproxySocket.PORT))
+			if (systemDns && protocol.startsWith("tcp")) endpoints.add(endpoint(TproxySocket.TCP_DNS_PORT))
+		}
+		if (backend != null) {
+			val protocol = if (backend.substringBefore(':').length == 32) "tcp6" else "tcp"
+			expected.getOrPut(protocol) { mutableSetOf() }.add(backend)
+		}
+		return expected.all { (protocol, endpoints) ->
+			val state = if (protocol.startsWith("tcp")) "0A" else "07"
 			File(proc, "net/$protocol").useLines { lines ->
-				lines.any { line ->
+				for (line in lines) {
 					val fields = line.trim().split(Regex("\\s+"))
-					fields.size > 9 &&
-						fields[1] == address + port &&
-						fields[3] == (if (protocol.startsWith("tcp")) "0A" else "07") &&
-						"socket:[${fields[9]}]" in sockets
+					if (fields.size > 9 && fields[3] == state && "socket:[${fields[9]}]" in sockets) {
+						endpoints.remove(fields[1])
+					}
 				}
 			}
+			endpoints.isEmpty()
 		}
 	}
 }

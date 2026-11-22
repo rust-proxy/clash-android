@@ -1,7 +1,6 @@
 package rs.clash.android.service
 
 import android.content.Context
-import android.content.pm.PackageManager
 import android.net.LocalSocket
 import android.net.LocalSocketAddress
 import android.os.Build
@@ -21,7 +20,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
 import org.json.JSONObject
 import rs.clash.android.R
 import rs.clash.android.ui.snackbar.SnackbarController
@@ -34,10 +32,12 @@ internal data class NativeStatus(
 	val pid: Int,
 	val ready: Boolean,
 	val mixedPort: Int,
+	val tcpDnsBackend: String?,
 )
 
 internal object TproxySocket {
 	const val PORT = 17893
+	const val TCP_DNS_PORT = 17894
 
 	fun request(
 		path: String,
@@ -56,9 +56,10 @@ internal object TproxySocket {
 			socket.outputStream.write(command.code)
 			val reply = socket.inputStream.bufferedReader().readLine() ?: error("Core disconnected")
 			if (reply == "STOPPED") return null
-			val (phase, port) = reply.split(' ')
+			val fields = reply.split(' ')
+			val (phase, port) = fields
 			check(phase == "STARTING" || phase == "READY")
-			return NativeStatus(peer.pid, phase == "READY", port.toInt())
+			return NativeStatus(peer.pid, phase == "READY", port.toInt(), fields.getOrNull(2))
 		}
 	}
 }
@@ -70,6 +71,7 @@ internal class NativeTproxy(
 ) {
 	companion object {
 		const val MODE_KEY = "kernel_su_tproxy"
+		const val DNS_KEY = "tproxy_system_dns"
 		private const val REQUESTED = "native_tproxy_requested"
 		private const val IN_FLIGHT = "native_tproxy_changing"
 	}
@@ -257,21 +259,11 @@ internal class NativeTproxy(
 		for (name in listOf("Country.mmdb", "geosite.dat")) {
 			context.assets.open("clash-res/$name").use { copyForCore(it, File(context.cacheDir, name)) }
 		}
-		val apps = config.getJSONArray("apps")
-		val uids =
-			(0 until apps.length())
-				.mapNotNull {
-					try {
-						context.packageManager.getApplicationInfo(apps.getString(it), 0).uid
-					} catch (_: PackageManager.NameNotFoundException) {
-						null
-					}
-				}.distinct()
 		config
-			.put("uids", JSONArray(uids))
 			.put("workDir", context.cacheDir.path)
 			.put("control", control)
 			.put("tproxyPort", TproxySocket.PORT)
+			.put("tcpDnsPort", TproxySocket.TCP_DNS_PORT.takeIf { config.getBoolean("systemDns") })
 	}
 
 	private fun copyForCore(

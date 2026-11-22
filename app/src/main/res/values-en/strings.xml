@@ -39,6 +39,8 @@
     <string name="proxy_service_channel">Proxy service</string>
     <string name="proxy_mode">Proxy mode</string>
     <string name="tproxy_authorization_hint">Grant Clash Android superuser access in KernelSU Manager. TPROXY keeps running after you exit or force-stop the app. Reopen the app to stop the proxy.</string>
+    <string name="tproxy_system_dns">Intercept system DNS</string>
+    <string name="tproxy_system_dns_desc">Resolve device-wide plaintext DNS through Clash (UDP and TCP port 53).</string>
     <string name="mode_tproxy">KernelSU TPROXY</string>
     <string name="proxy_mode_stop_first">Stop the proxy before changing modes.</string>
     <string name="tproxy_failed">TPROXY failed. Check superuser access for Clash Android in KernelSU Manager and kernel TPROXY support.</string>

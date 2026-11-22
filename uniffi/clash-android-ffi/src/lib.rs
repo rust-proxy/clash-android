@@ -236,6 +236,16 @@ async fn run_clash(
     work_dir: String,
     over: ProfileOverride,
 ) -> Result<Arc<ClashInstance>, EyreError> {
+    let (core, _) = start_android_core(config_path, work_dir, over, None).await?;
+    Ok(core)
+}
+
+async fn start_android_core(
+    config_path: String,
+    work_dir: String,
+    over: ProfileOverride,
+    tproxy_dns: Option<bool>,
+) -> Result<(Arc<ClashInstance>, Option<SocketAddr>), EyreError> {
     std::env::set_current_dir(&work_dir)?;
     let mut config_def = ConfigDef::try_from(PathBuf::from(config_path.clone()))?;
     let mixed_port = config_def
@@ -283,7 +293,7 @@ async fn run_clash(
                     fw_mark: None,
                 },
                 udp: true,
-                dns_hijack: true,
+                dns_hijack: tproxy_dns.unwrap_or(true),
             });
         }
     }
@@ -384,6 +394,15 @@ async fn run_clash(
         config.dns.nameserver.clone()
     };
 
+    // Keep an explicit profile TCP listener. Otherwise share the managed
+    // loopback address with the UDP DNS service (separate transport).
+    let tcp_dns = (tproxy_dns == Some(true)).then(|| {
+        *config
+            .dns
+            .listen
+            .tcp
+            .get_or_insert_with(|| SocketAddr::from((Ipv4Addr::LOCALHOST, 53553)))
+    });
     config.dns = dns::Config {
         enable: true,
         ipv6: over.ipv6,
@@ -433,12 +452,15 @@ async fn run_clash(
         Ok(())
     });
 
-    Ok(Arc::new(ClashInstance {
-        mixed_port: mixed_port.map_or(0, |port| port.0),
-        cancel_token,
-        stopped,
-        _handle: Some(handle),
-    }))
+    Ok((
+        Arc::new(ClashInstance {
+            mixed_port: mixed_port.map_or(0, |port| port.0),
+            cancel_token,
+            stopped,
+            _handle: Some(handle),
+        }),
+        tcp_dns,
+    ))
 }
 
 uniffi::setup_scaffolding!("clash_android_ffi");

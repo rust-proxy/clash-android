@@ -53,6 +53,16 @@ class SettingsViewModel(
 	var kernelSuEnabled by mutableStateOf(prefs.getBoolean(NativeTproxy.MODE_KEY, false))
 		private set
 
+	var tproxySystemDns by mutableStateOf(prefs.getBoolean(NativeTproxy.DNS_KEY, true))
+		private set
+
+	fun updateTproxySystemDns(enabled: Boolean) {
+		if (!kernelSuEnabled || tproxySystemDns == enabled) return
+		tproxySystemDns = enabled
+		prefs.edit { putBoolean(NativeTproxy.DNS_KEY, enabled) }
+		restartProxy()
+	}
+
 	fun selectKernelSu(enabled: Boolean) {
 		if (session.value.running) return
 		kernelSuEnabled = enabled
@@ -84,6 +94,7 @@ class SettingsViewModel(
 		SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
 			when (key) {
 				NativeTproxy.MODE_KEY -> kernelSuEnabled = prefs.getBoolean(key, false)
+				NativeTproxy.DNS_KEY -> tproxySystemDns = prefs.getBoolean(key, true)
 				"app_filter_mode" -> appFilterMode = loadAppFilterMode()
 				"allowed_apps" -> allowedApps = loadAllowedApps()
 				"disallowed_apps" -> disallowedApps = loadDisallowedApps()
@@ -175,6 +186,7 @@ class SettingsViewModel(
 		mode: AppFilterMode,
 		apps: Set<String>,
 	) {
+		if (kernelSuEnabled) return
 		val allowed = if (mode == AppFilterMode.ALLOWED) apps else emptySet()
 		val disallowed = if (mode == AppFilterMode.DISALLOWED) apps else emptySet()
 		val changed =

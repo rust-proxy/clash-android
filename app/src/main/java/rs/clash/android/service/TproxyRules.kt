@@ -136,30 +136,28 @@ internal class TproxyRules(
 		change(ip + listOf("rule", "add") + policy, ip + listOf("rule", "del") + policy)
 		rule(out, "-m", "owner", "--uid-owner", uid.toString(), "-j", "RETURN")
 		rule(out, "-m", "owner", "--gid-owner", uid.toString(), "-j", "RETURN")
-		rule(out, "-m", "owner", "--uid-owner", "0", "-j", "RETURN")
 		rule(out, "-o", "lo", "-j", "RETURN")
 		val bypass =
 			if (v6) {
 				listOf(
 					"::1/128",
-					"fe80::/10",
 					"ff00::/8",
 				)
 			} else {
-				listOf("127.0.0.0/8", "169.254.0.0/16", "224.0.0.0/4", "255.255.255.255/32")
+				listOf("127.0.0.0/8", "224.0.0.0/4", "255.255.255.255/32")
 			}
 		for (prefix in bypass) rule(out, "-d", prefix, "-j", "RETURN")
-		val uids = config.getJSONArray("uids")
-		val mode = config.getString("mode")
-		for (index in 0 until uids.length()) {
-			val owner = uids.getInt(index).toString()
-			if (mode == "ALLOWED") {
-				rule(out, "-m", "owner", "--uid-owner", owner, "-j", "MARK", "--set-xmark", mark)
-			} else if (mode == "DISALLOWED") {
-				rule(out, "-m", "owner", "--uid-owner", owner, "-j", "RETURN")
+		val systemDns = config.getBoolean("systemDns")
+		if (systemDns) {
+			// netd may send DNS as UID 0, including to a link-local resolver.
+			for (proto in listOf("udp", "tcp")) {
+				rule(out, "-p", proto, "--dport", "53", "-j", "MARK", "--set-xmark", mark)
 			}
+			rule(pre, "-p", "tcp", "--dport", "53", "-j", "TPROXY", "--on-ip", loopback, "--on-port", TproxySocket.TCP_DNS_PORT.toString())
 		}
-		if (mode != "ALLOWED") rule(out, "-j", "MARK", "--set-xmark", mark)
+		rule(out, "-m", "owner", "--uid-owner", "0", "-j", "RETURN")
+		rule(out, "-d", if (v6) "fe80::/10" else "169.254.0.0/16", "-j", "RETURN")
+		rule(out, "-j", "MARK", "--set-xmark", mark)
 		for (proto in listOf("tcp", "udp")) {
 			rule(pre, "-p", proto, "-j", "TPROXY", "--on-ip", loopback, "--on-port", TproxySocket.PORT.toString())
 		}
@@ -168,9 +166,8 @@ internal class TproxyRules(
 		rule("INPUT", "-i", "lo", "-m", "mark", "--mark", mark, "-j", "MARK", "--set-xmark", "0/0x40000000")
 		rule("PREROUTING", "-i", "lo", "-m", "mark", "--mark", mark, "-j", pre)
 		// Attach OUTPUT last and detach it first so no new traffic enters during cleanup.
-		val firstUid = uid / 100000 * 100000
 		for (proto in listOf("tcp", "udp")) {
-			rule("OUTPUT", "-p", proto, "-m", "owner", "--uid-owner", "$firstUid-${firstUid + 99999}", "-j", out)
+			rule("OUTPUT", "-p", proto, "-j", out)
 		}
 	}
 

@@ -91,6 +91,10 @@ fun AppSelectorScreen(
 	modifier: Modifier = Modifier,
 	viewModel: SettingsViewModel = viewModel(),
 ) {
+	if (viewModel.kernelSuEnabled) {
+		LaunchedEffect(Unit) { navigator.navigateUp() }
+		return
+	}
 	val context = LocalContext.current
 	val coroutineScope = rememberCoroutineScope()
 	var apps by remember { mutableStateOf<List<AppInfo>>(emptyList()) }

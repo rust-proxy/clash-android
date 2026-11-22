@@ -232,20 +232,37 @@ fun SettingsScreen(
 						},
 					)
 
-					HorizontalDivider(modifier = Modifier.padding(start = 56.dp))
-					SettingsItem(
-						icon = Icons.Default.FilterList,
-						title = stringResource(R.string.settings_app_filter),
-						subtitle =
-							when (viewModel.appFilterMode) {
-								AppFilterMode.ALL -> stringResource(R.string.app_selector_mode_all)
-								AppFilterMode.ALLOWED -> stringResource(R.string.app_selector_selected, viewModel.allowedApps.size)
-								AppFilterMode.DISALLOWED -> stringResource(R.string.app_selector_selected, viewModel.disallowedApps.size)
+					if (!viewModel.kernelSuEnabled) {
+						HorizontalDivider(modifier = Modifier.padding(start = 56.dp))
+						SettingsItem(
+							icon = Icons.Default.FilterList,
+							title = stringResource(R.string.settings_app_filter),
+							subtitle =
+								when (viewModel.appFilterMode) {
+									AppFilterMode.ALL -> stringResource(R.string.app_selector_mode_all)
+									AppFilterMode.ALLOWED -> stringResource(R.string.app_selector_selected, viewModel.allowedApps.size)
+									AppFilterMode.DISALLOWED -> stringResource(R.string.app_selector_selected, viewModel.disallowedApps.size)
+								},
+							onClick = {
+								navigator.navigate(AppSelectorScreenDestination)
 							},
-						onClick = {
-							navigator.navigate(AppSelectorScreenDestination)
-						},
-					)
+						)
+					}
+				}
+			}
+
+			if (viewModel.kernelSuEnabled) {
+				item { SectionHeader(text = stringResource(R.string.mode_tproxy)) }
+				item {
+					SettingsCard {
+						SettingsSwitchItem(
+							icon = Icons.Default.Dns,
+							title = stringResource(R.string.tproxy_system_dns),
+							subtitle = stringResource(R.string.tproxy_system_dns_desc),
+							checked = viewModel.tproxySystemDns,
+							onCheckedChange = viewModel::updateTproxySystemDns,
+						)
+					}
 				}
 			}
 

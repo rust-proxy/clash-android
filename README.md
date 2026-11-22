@@ -2,7 +2,7 @@
 
 ## 功能清单
 
-- [x] 在 VPN 和 KernelSU TPROXY 之间选择，按应用设置代理范围
+- [x] 在 VPN 和 KernelSU TPROXY 之间选择，VPN 支持分应用代理，TPROXY 代理全设备
 - [x] 切换代理组节点，批量测试组内节点延迟
 - [x] 查看流量、内存占用和活跃连接，以及每条连接命中的规则和代理链
 - [x] 导入本地 Clash 配置，校验并切换配置
@@ -14,7 +14,11 @@
 
 ## 使用 KernelSU TPROXY
 
-在 KernelSU 管理器的「超级用户」中授权 Clash Android。停止当前代理，在「设置 → 代理模式」选择 KernelSU TPROXY，然后从首页启动。原有配置可直接使用。此模式通过内核的 TPROXY 和策略路由转发本机 TCP、UDP，保留 Android VPN 槽位。开启 IPv6 时，设备内核也需要支持 IPv6 TPROXY。后台由一个原生进程加载 APK 中的 Clash 库。退出界面或在系统设置中强行停止 App 后，代理会继续运行。重新打开 App 可接管当前会话，点击首页的停止按钮会退出内核并清理规则。
+在 KernelSU 管理器的「超级用户」中授权 Clash Android。停止当前代理，在「设置 → 代理模式」选择 KernelSU TPROXY，然后从首页启动。原有配置可直接使用。此模式通过内核的 TPROXY 和策略路由转发本机 TCP、UDP，保留 Android VPN 槽位。开启 IPv6 时，设备内核也需要支持 IPv6 TPROXY。
+
+设置页的 TPROXY 专区默认开启「接管系统 DNS」，将非回环单播的 UDP/53 和 TCP/53 交给 Clash 配置的 DNS 解析器。Android 严格私人 DNS 和应用内 DoH 使用加密协议，不在此开关的接管范围内。切回 VPN 后可继续使用此前保存的分应用设置。
+
+后台由一个原生进程加载 APK 中的 Clash 库。退出界面或在系统设置中强行停止 App 后，代理会继续运行。重新打开 App 可接管当前会话，点击首页的停止按钮会退出内核并清理规则。
 
 如果代理内核本身意外退出，重新打开 App 会清理上次会话的规则，之后可以从首页再次启动。
 

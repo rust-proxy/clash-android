@@ -134,6 +134,17 @@ internal class AndroidVpnController(
 		val path = context.getSharedPreferences("file_prefs", Context.MODE_PRIVATE).getString("profile_path", null)
 		if (path.isNullOrEmpty()) return null
 		val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+		val config =
+			JSONObject()
+				.put("path", path)
+				.put("fakeIp", prefs.getBoolean("fake_ip", false))
+				.put("ipv6", prefs.getBoolean("ipv6", true))
+		if (prefs.getBoolean(NativeTproxy.MODE_KEY, false)) {
+			return config
+				.put(NativeTproxy.MODE_KEY, true)
+				.put("systemDns", prefs.getBoolean(NativeTproxy.DNS_KEY, true))
+				.toString()
+		}
 		val mode = prefs.getString("app_filter_mode", "ALL") ?: "ALL"
 		val apps =
 			when (mode) {
@@ -141,13 +152,9 @@ internal class AndroidVpnController(
 				"DISALLOWED" -> prefs.getStringSet("disallowed_apps", emptySet())
 				else -> emptySet()
 			}
-		return JSONObject()
-			.put("path", path)
-			.put(NativeTproxy.MODE_KEY, prefs.getBoolean(NativeTproxy.MODE_KEY, false))
+		return config
 			.put("mode", mode)
 			.put("apps", JSONArray(apps.orEmpty().sorted()))
-			.put("fakeIp", prefs.getBoolean("fake_ip", false))
-			.put("ipv6", prefs.getBoolean("ipv6", true))
 			.toString()
 	}
 
