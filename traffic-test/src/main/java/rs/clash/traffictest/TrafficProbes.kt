@@ -21,6 +21,7 @@ import kotlin.coroutines.resumeWithException
 
 internal class ProbeError(
 	val messageRes: Int,
+	vararg val args: String,
 ) : Exception()
 
 internal suspend fun echo(
@@ -69,7 +70,10 @@ private fun exchangeEcho(
 	return token
 }
 
-internal suspend fun dnsLookup(name: String): List<InetAddress> {
+internal suspend fun dnsLookup(
+	name: String,
+	type: Int? = null,
+): List<InetAddress> {
 	val domain =
 		try {
 			IDN.toASCII(name, IDN.USE_STD3_ASCII_RULES)
@@ -82,12 +86,7 @@ internal suspend fun dnsLookup(name: String): List<InetAddress> {
 	return suspendCancellableCoroutine { continuation ->
 		val cancel = CancellationSignal()
 		continuation.invokeOnCancellation { cancel.cancel() }
-		DnsResolver.getInstance().query(
-			null, // Use this application's default network, including its VPN.
-			domain,
-			DnsResolver.FLAG_NO_CACHE_LOOKUP,
-			Runnable::run,
-			cancel,
+		val callback =
 			object : DnsResolver.Callback<List<InetAddress>> {
 				override fun onAnswer(
 					answer: List<InetAddress>,
@@ -103,7 +102,13 @@ internal suspend fun dnsLookup(name: String): List<InetAddress> {
 				override fun onError(error: DnsResolver.DnsException) {
 					continuation.resumeWithException(error)
 				}
-			},
-		)
+			}
+		val resolver = DnsResolver.getInstance()
+		val flags = DnsResolver.FLAG_NO_CACHE_LOOKUP
+		if (type == null) {
+			resolver.query(null, domain, flags, Runnable::run, cancel, callback)
+		} else {
+			resolver.query(null, domain, type, flags, Runnable::run, cancel, callback)
+		}
 	}
 }

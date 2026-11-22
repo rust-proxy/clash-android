@@ -19,4 +19,9 @@
     <string name="early_eof">TCP connection closed before the full reply arrived</string>
     <string name="echo_mismatch">Reply differs from the sent payload</string>
     <string name="no_addresses">DNS returned no addresses</string>
+    <string name="fake_ipv6">IPv6 fake IP allocation and TLS connection</string>
+    <string name="fake_prefix">Expected IPv6 fake IP range (CIDR)</string>
+    <string name="invalid_prefix">Enter a valid IPv6 CIDR</string>
+    <string name="prefix_mismatch">AAAA response outside the expected range: %1$s</string>
+    <string name="connect_failed">Allocated %1$s, TLS connection failed: %2$s</string>
 </resources>

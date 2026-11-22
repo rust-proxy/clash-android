@@ -18,6 +18,7 @@ internal enum class Probe(
 	TCP(R.string.tcp),
 	UDP(R.string.udp),
 	DNS(R.string.dns),
+	FAKE_IPV6(R.string.fake_ipv6),
 }
 
 internal data class Result(
@@ -32,6 +33,7 @@ internal class ProbeViewModel(
 	var host by mutableStateOf("10.0.2.2")
 	var port by mutableStateOf("39007")
 	var domain by mutableStateOf("example.com")
+	var fakeIpRange6 by mutableStateOf("fdfe:dcba:9876::1/64")
 	val results = mutableStateMapOf<Probe, Result>()
 	var running by mutableStateOf(false)
 		private set
@@ -41,6 +43,7 @@ internal class ProbeViewModel(
 		val address = host.trim()
 		val portText = port.trim()
 		val dnsName = domain.trim()
+		val prefix = fakeIpRange6.trim()
 		val context = getApplication<Application>()
 		results.clear()
 		running = true
@@ -57,6 +60,7 @@ internal class ProbeViewModel(
 										val token = echo(address, portText, udp = probe == Probe.UDP)
 										context.getString(R.string.verified_echo, token)
 									}
+									Probe.FAKE_IPV6 -> fakeIpV6Connect(dnsName, prefix)
 									Probe.DNS -> dnsLookup(dnsName).mapNotNull { it.hostAddress }.distinct().joinToString("\n")
 								}
 							}
@@ -65,7 +69,7 @@ internal class ProbeViewModel(
 					} catch (e: CancellationException) {
 						throw e
 					} catch (e: ProbeError) {
-						context.getString(e.messageRes)
+						context.getString(e.messageRes, *e.args)
 					} catch (e: Exception) {
 						val cause = e.cause ?: e
 						cause.localizedMessage ?: cause.javaClass.simpleName

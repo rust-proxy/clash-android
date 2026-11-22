@@ -19,4 +19,9 @@
     <string name="early_eof">收到完整回包前，TCP 连接已关闭</string>
     <string name="echo_mismatch">回包与发送的内容不同</string>
     <string name="no_addresses">DNS 应答没有返回地址</string>
+    <string name="fake_ipv6">IPv6 Fake IP 分配与 TLS 连接</string>
+    <string name="fake_prefix">预期的 IPv6 Fake IP 网段（CIDR）</string>
+    <string name="invalid_prefix">请输入有效的 IPv6 CIDR</string>
+    <string name="prefix_mismatch">AAAA 应答超出预期网段：%1$s</string>
+    <string name="connect_failed">已分配 %1$s，TLS 连接失败：%2$s</string>
 </resources>

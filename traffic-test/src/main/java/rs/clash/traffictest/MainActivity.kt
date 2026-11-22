@@ -101,6 +101,18 @@ private fun ProbeScreen(model: ProbeViewModel = viewModel()) {
 				singleLine = true,
 				keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
 			)
+			OutlinedTextField(
+				value = model.fakeIpRange6,
+				onValueChange = {
+					model.fakeIpRange6 = it
+					model.results.remove(Probe.FAKE_IPV6)
+				},
+				modifier = Modifier.fillMaxWidth(),
+				label = { Text(stringResource(R.string.fake_prefix)) },
+				enabled = !model.running,
+				singleLine = true,
+				keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+			)
 			Button(
 				onClick = {
 					focus.clearFocus()
