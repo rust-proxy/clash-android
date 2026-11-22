@@ -22,7 +22,7 @@ googleServices {
 val firebaseRelease = file("src/release/google-services.json").isFile
 val firebaseDebug = file("src/debug/google-services.json").isFile
 
-val baseVersionName = "0.6.1"
+val baseVersionName = "0.6.2"
 val Project.verName: String get() = "${baseVersionName}$versionNameSuffix.${exec("git rev-parse --short HEAD")}"
 val Project.verCode: Int get() = exec("git rev-list --count HEAD").toInt()
 val Project.isDevVersion: Boolean
