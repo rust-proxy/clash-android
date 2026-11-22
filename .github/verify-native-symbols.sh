@@ -24,7 +24,7 @@ verify_lib() {
   [[ ${#generated[@]} == 1 && -s "${generated[0]}" ]] || { echo "Missing or ambiguous Crashlytics symbol file for $abi ($id)" >&2; exit 1; }
   echo "$abi $lib $id" | tee -a "$manifest"
 }
-for abi in arm64-v8a armeabi-v7a x86 x86_64; do
+for abi in arm64-v8a armeabi-v7a x86_64; do
   verify_lib "$abi" libclash_android_ffi.so "core/build/rustJniLibs/android/$abi/libclash_android_ffi.so"
   "${readelf[0]}" --dyn-syms --wide "$work/packed.so" | grep -w 'uniffi_clash_android_ffi_fn_func_open_transfer' > /dev/null
 done

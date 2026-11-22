@@ -27,6 +27,8 @@ android {
     buildFeatures {
         compose = true
     }
+	// Older incremental builds can still have x86 libraries in rustJniLibs.
+	packaging.jniLibs.excludes += "**/x86/*.so"
 }
 
 kotlin {
@@ -87,7 +89,7 @@ cargo {
 	}
 	environmentalOverrides["RUSTC_BOOTSTRAP"] = "1"
 
-	targets = listOf("arm64", "arm", "x86", "x86_64")
+	targets = listOf("arm64", "arm", "x86_64")
 //	targets = listOf("arm64")
     // Cargo keeps line tables here. AGP strips the APK copy; CI archives the originals.
     profile = "release"
@@ -105,6 +107,9 @@ abstract class PackageTproxyLaunchers : DefaultTask() {
 	@get:Inject
 	abstract val execOperations: ExecOperations
 
+	@get:Inject
+	abstract val fileSystemOperations: FileSystemOperations
+
 	@get:InputFile
 	@get:PathSensitive(PathSensitivity.NONE)
 	abstract val llvmStrip: RegularFileProperty
@@ -118,11 +123,11 @@ abstract class PackageTproxyLaunchers : DefaultTask() {
 
 	@TaskAction
 	fun copyLaunchers() {
+		fileSystemOperations.delete { delete(assets) }
 		for (binary in binaries) {
 			val abi = when (binary.parentFile.parentFile.name) {
 				"armv7-linux-androideabi" -> "armeabi-v7a"
 				"aarch64-linux-android" -> "arm64-v8a"
-				"i686-linux-android" -> "x86"
 				"x86_64-linux-android" -> "x86_64"
 				else -> error("Unknown Android target for $binary")
 			}
@@ -144,7 +149,7 @@ androidComponents.onVariants { variant ->
 	val pack = tasks.register<PackageTproxyLaunchers>("package${variant.name.replaceFirstChar { it.uppercase() }}TproxyLaunchers") {
 		dependsOn("cargoBuild")
 		llvmStrip.fileProvider(stripTool)
-		for (triple in listOf("armv7-linux-androideabi", "aarch64-linux-android", "i686-linux-android", "x86_64-linux-android")) {
+		for (triple in listOf("armv7-linux-androideabi", "aarch64-linux-android", "x86_64-linux-android")) {
 			binaries.from(layout.projectDirectory.file("../uniffi/target/$triple/release/clash-launcher"))
 		}
 	}

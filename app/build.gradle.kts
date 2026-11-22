@@ -116,7 +116,7 @@ android {
 
 		testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 		ndk {
-			abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64"))
+			abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a", "x86_64"))
 		}
 		proguardFiles(
 			getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -171,7 +171,7 @@ android {
 		abi {
 			isEnable = env("ANDROID_SPLIT_ABI_ENABLE") == "true"
 			reset()
-			include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+			include("arm64-v8a", "armeabi-v7a", "x86_64")
 			isUniversalApk = env("ANDROID_SPLIT_ABI_UNIVERSAL_APK") == "true"
 		}
 	}

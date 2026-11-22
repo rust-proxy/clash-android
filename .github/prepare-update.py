@@ -42,7 +42,7 @@ def prepare(metadata_file, destination, version, changelog):
         with target.open("rb") as apk:
             digest = hashlib.file_digest(apk, "sha256").hexdigest()
         manifest["assets"][abi] = {"file": target.name, "size": target.stat().st_size, "sha256": digest}
-    if set(manifest["assets"]) != {"all", "arm64-v8a", "armeabi-v7a", "x86", "x86_64"}:
+    if set(manifest["assets"]) != {"all", "arm64-v8a", "armeabi-v7a", "x86_64"}:
         raise ValueError("Missing or unexpected release ABI")
     (destination / "update.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
 

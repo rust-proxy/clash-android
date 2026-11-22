@@ -1,5 +1,7 @@
 # clash-android
 
+Android 安装包支持 `arm64-v8a`、`armeabi-v7a` 和 `x86_64`。通用 APK 包含这三种架构。
+
 ## 功能清单
 
 - [x] 在 VPN 和 KernelSU TPROXY 之间选择，VPN 支持分应用代理，TPROXY 代理全设备
