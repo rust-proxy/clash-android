@@ -2,12 +2,24 @@
 //! path, and a session on stdin. The APK owns the proxy implementation.
 use std::{env, error::Error, ffi::CString, io, os::unix::ffi::OsStrExt};
 mod diagnostics;
+mod overview;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut args = env::args_os().skip(1);
     let first = args.next();
-    if first.as_deref() == Some(std::ffi::OsStr::new("--diagnostics")) && args.next().is_none() {
-        return diagnostics::report();
+    if let Some(command @ ("--overview" | "--diagnostics")) =
+        first.as_deref().and_then(|v| v.to_str())
+    {
+        if args.next().is_some() {
+            return Err("unexpected diagnostic argument".into());
+        }
+        if unsafe { libc::geteuid() } != 0 {
+            return Err("KernelSU root required".into());
+        }
+        return match command {
+            "--overview" => overview::report(),
+            _ => diagnostics::report(),
+        };
     }
     let app_uid: u32 = first
         .and_then(|arg| arg.to_str()?.parse().ok())

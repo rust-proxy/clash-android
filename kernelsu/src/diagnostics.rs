@@ -134,7 +134,7 @@ fn recent_timeouts(pid: u32) -> io::Result<Vec<String>> {
     Ok(recent.into())
 }
 
-fn processes() -> io::Result<Vec<Core>> {
+pub fn core_processes() -> io::Result<Vec<(u32, u32)>> {
     let mut cores = Vec::new();
     for entry in fs::read_dir("/proc")? {
         let dir = entry?;
@@ -180,9 +180,18 @@ fn processes() -> io::Result<Vec<Core>> {
             .and_then(|l| l.split_whitespace().nth(1))
             .and_then(|n| n.parse().ok())
             .ok_or_else(|| io::Error::other("无法读取内核有效 UID"))?;
-        let sockets = owned_sockets(&path);
+        cores.push((pid, uid));
+    }
+    cores.sort_unstable();
+    Ok(cores)
+}
+
+pub fn report() -> Result<(), Box<dyn Error>> {
+    let mut processes = Vec::new();
+    for (pid, uid) in core_processes()? {
+        let sockets = owned_sockets(Path::new(&format!("/proc/{pid}")));
         let timeouts = recent_timeouts(pid);
-        cores.push(Core {
+        processes.push(Core {
             pid,
             uid,
             socket_error: sockets.as_ref().err().map(ToString::to_string),
@@ -191,15 +200,8 @@ fn processes() -> io::Result<Vec<Core>> {
             timeouts: timeouts.unwrap_or_default(),
         });
     }
-    Ok(cores)
-}
-
-pub fn report() -> Result<(), Box<dyn Error>> {
-    if unsafe { libc::geteuid() } != 0 {
-        return Err("KernelSU root required".into());
-    }
     let snapshot = Snapshot {
-        processes: processes()?,
+        processes,
         route4: routes("-4"),
         route6: routes("-6"),
     };

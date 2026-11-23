@@ -1,89 +1,118 @@
 <script>
   import { onMount } from "svelte";
   import { readSnapshot } from "./snapshot.js";
+  import { addSample } from "./traffic.js";
+  import Diagnostics from "./Diagnostics.svelte";
+  import Overview from "./Overview.svelte";
 
-  const tcpStates = {
-    "01": "已建立", "02": "SYN-SENT", "03": "SYN-RECV", "04": "FIN-WAIT-1",
-    "05": "FIN-WAIT-2", "06": "TIME-WAIT", "07": "CLOSED", "08": "CLOSE-WAIT",
-    "09": "LAST-ACK", "0A": "LISTEN", "0B": "CLOSING",
-  };
-  let snapshot = $state(null);
+  let view = $state("overview");
+  let automatic = $state(true);
   let busy = $state(false);
-  let status = $state("正在读取设备数据…");
-  let placeholder = $derived(busy ? "读取中…" : "读取失败");
+  let snapshot = $state(null);
+  let status = $state("");
+  let history = $state({});
+  let generation = 0;
+  let timer;
+  let mounted = false;
+  let pending = false;
 
   async function refresh() {
-    if (busy) return;
+    clearTimeout(timer);
+    if (!mounted || document.hidden) return;
+    if (busy) {
+      pending = true;
+      return;
+    }
+    const current = generation;
     busy = true;
-    status = "正在读取设备数据…";
     try {
-      snapshot = await readSnapshot();
+      const result = await readSnapshot(view);
+      if (current !== generation) return;
+      if (view === "overview") history = addSample(history, result, performance.now());
+      snapshot = result;
       status = "采样于 " + new Date().toLocaleTimeString();
     } catch (error) {
-      snapshot = null;
+      if (current !== generation) return;
       status = error.message;
+      snapshot = null;
+      history = {};
     } finally {
       busy = false;
+      if (pending) {
+        pending = false;
+        refresh();
+      } else if (current === generation && view === "overview" && automatic && window.ksu?.exec) {
+        timer = setTimeout(refresh, snapshot?.length ? 2000 : 10000);
+      }
     }
   }
-  onMount(() => { refresh(); });
+
+  function invalidate() {
+    generation++;
+    clearTimeout(timer);
+    pending = false;
+    history = {};
+  }
+
+  function changeView(next) {
+    if (view === next) return;
+    invalidate();
+    view = next;
+    snapshot = null;
+    status = "";
+    refresh();
+  }
+
+  function toggleAutomatic() {
+    automatic = !automatic;
+    if (automatic) {
+      invalidate();
+      refresh();
+    } else {
+      clearTimeout(timer);
+    }
+  }
+
+  onMount(() => {
+    mounted = true;
+    function visibilityChanged() {
+      invalidate();
+      if (!document.hidden && (snapshot === null || (view === "overview" && automatic))) refresh();
+    }
+    document.addEventListener("visibilitychange", visibilityChanged);
+    refresh();
+    return () => {
+      mounted = false;
+      invalidate();
+      document.removeEventListener("visibilitychange", visibilityChanged);
+    };
+  });
 </script>
 
 <main>
   <header>
-    <div><h1>TPROXY 诊断</h1><p id="updated" role="status">{status}</p></div>
+    <div><h1>TPROXY 仪表盘</h1><p id="updated">{status || "正在读取设备数据…"}</p></div>
     <button type="button" disabled={busy} onclick={refresh}>刷新</button>
   </header>
-  <section class="core">
-    <h2>原生内核</h2>
-    <p class="metric">{snapshot ? snapshot.processes.map(p => `PID ${p.pid} · UID ${p.uid}`).join(" / ") || "未运行" : placeholder}</p>
-  </section>
-  <section>
-    <h2>策略路由</h2>
-    <p class="hint">优先级 9055 · 路由表 17893</p>
-    {#each [4, 6] as family}
-      <h3>IPv{family}</h3>
-      <pre>{snapshot ? snapshot["route" + family].join("\n") || "未发现模块规则或路由" : placeholder}</pre>
-    {/each}
-  </section>
-  <section>
-    <h2>DoT 套接字</h2>
-    <p class="hint">内核持有的出站 TCP/853 连接</p>
-    <div id="sockets">
-      {#if !snapshot}{placeholder}
-      {:else if !snapshot.processes.length}内核未运行
-      {:else}
-        {#if snapshot.processes.some(p => p.sockets.length)}
-          <table>
-            <thead><tr><th>PID</th><th>UID</th><th>Inode</th><th>TCP 状态</th></tr></thead>
-            <tbody>
-              {#each snapshot.processes as core}
-                {#each core.sockets as socket}
-                  <tr><td>{core.pid}</td><td>{socket.uid}</td><td>{socket.inode}</td><td>{tcpStates[socket.state] ?? socket.state}</td></tr>
-                {/each}
-              {/each}
-            </tbody>
-          </table>
-        {:else if !snapshot.processes.some(p => p.socket_error)}采样时没有 TCP/853 套接字{/if}
-        {#each snapshot.processes as core}
-          {#if core.socket_error}<p>无法读取 PID {core.pid} 的套接字：{core.socket_error}</p>{/if}
-        {/each}
-      {/if}
+  <nav aria-label="仪表盘视图">
+    <button aria-pressed={view === "overview"} onclick={() => changeView("overview")}>运行总览</button>
+    <button aria-pressed={view === "diagnostics"} onclick={() => changeView("diagnostics")}>网络诊断</button>
+  </nav>
+  {#if view === "overview"}
+    <div class="toolbar">
+      <h2>内核状态</h2>
+      <label><input type="checkbox" checked={automatic} onchange={toggleAutomatic}>自动刷新</label>
     </div>
-  </section>
-  <section>
-    <h2>最近的 DNS 超时</h2>
-    <p class="hint">当前内核进程的系统日志，每个进程最近 20 条</p>
-    <div id="timeouts">
-      {#if !snapshot}{placeholder}
-      {:else if !snapshot.processes.length}内核未运行
-      {:else}
-        {#each snapshot.processes as core}
-          {#if core.log_error}<p>无法读取 PID {core.pid} 的日志：{core.log_error}</p>{/if}
-          {#each core.timeouts as line}<pre>{core.pid}　{line}</pre>{/each}
-        {/each}
-        {#if !snapshot.processes.some(p => p.log_error || p.timeouts.length)}当前日志中未发现 DNS 超时{/if}
-      {/if}
-    </div>
-  </section>
+    {#if snapshot === null}
+      <section>{busy ? "正在读取内核状态…" : "未能获取内核状态"}</section>
+    {:else if !snapshot.length}
+      <section class="empty"><h3>内核未运行</h3><p class="hint">在 Clash Android 启动 KernelSU TPROXY 后可查看流量和连接。</p></section>
+    {:else}
+      {#each snapshot as core (core.pid)}
+        <Overview {core} samples={history[core.pid]?.points ?? []} />
+      {/each}
+    {/if}
+  {:else}
+    <Diagnostics {snapshot} placeholder={busy ? "读取中…" : "读取失败"} />
+  {/if}
 </main>
