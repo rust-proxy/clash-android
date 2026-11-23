@@ -20,14 +20,17 @@ lto = true
 codegen-units = 1
 panic = "unwind"
 strip = "none"
+debug = "none"
+
+[profile.release.package.clash-android-ffi]
 debug = "line-tables-only"
 
-# Referenced by core/build.gradle.kts ("release-dbg"): a release build that keeps
-# line tables so Rust panics produce symbolicated backtraces in logcat.
+[profile.release.package.clash-lib]
+debug = "line-tables-only"
+
 [profile.release-dbg]
 inherits = "release"
 strip = "none"
-debug = "line-tables-only"
 
 [profile.detailed-release]
 inherits = "release"
@@ -35,7 +38,6 @@ opt-level = 1
 lto = "thin"
 
 strip = "none"
-debug = "line-tables-only"
 split-debuginfo = "off"
 panic = "unwind"
 
