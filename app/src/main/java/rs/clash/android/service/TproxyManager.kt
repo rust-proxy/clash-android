@@ -7,10 +7,9 @@ import android.util.Log
 import org.json.JSONObject
 import java.io.File
 import java.io.RandomAccessFile
-import java.util.zip.ZipFile
 import kotlin.system.exitProcess
 
-/** Short-lived KernelSU command. The installed APK is the only source of executable code. */
+/** Short-lived KernelSU command. The module launches the installed APK's native core. */
 internal object TproxyManager {
 	@JvmStatic
 	fun main(args: Array<String>) {
@@ -26,16 +25,16 @@ internal object TproxyManager {
 			RandomAccessFile(File(dir.parentFile, "manager.lock"), "rw").use { file ->
 				file.channel.lock().use {
 					val rules = TproxyRules(dir)
-					var status = TproxySocket.request(control, uid)
+					val status = TproxySocket.request(control, uid)
 					when (action) {
 						"recover" -> if (status?.ready != true || !rules.installed) stop(rules, control, uid)
 						"stop" -> stop(rules, control, uid)
 						"start", "restart" -> {
-							if (action == "restart" || status?.ready != true || !rules.installed) {
+							if (action == "restart" || status?.ready != true || status.ownerUid != 0 || !rules.installed) {
+								val launcher = moduleLauncher(abi)
 								stop(rules, control, uid)
-								status = null
+								start(launcher, library, control, uid, config, rules)
 							}
-							if (status == null) start(dir, abi, library, control, uid, config, rules)
 						}
 						else -> error("Unknown TPROXY operation")
 					}
@@ -67,34 +66,24 @@ internal object TproxyManager {
 		}
 	}
 
-	private fun launcher(
-		dir: File,
-		abi: String,
-	): File {
-		val dest = File(dir, "clash-launcher")
-		val temp = File.createTempFile("launcher-", null, dir)
-		try {
-			val installed = checkNotNull(System.getenv("CLASSPATH")).split(':')
-			check(
-				installed.any { path ->
-					ZipFile(path).use { zip ->
-						val entry = zip.getEntry("assets/tproxy/$abi/clash-launcher") ?: return@use false
-						zip.getInputStream(entry).use { input -> temp.outputStream().use { input.copyTo(it) } }
-						true
-					}
-				},
-			) { "Launcher missing from installed APK" }
-			Os.chmod(temp.path, 448)
-			Os.rename(temp.path, dest.path)
-			return dest
-		} finally {
-			temp.delete()
-		}
+	private fun moduleLauncher(abi: String): File {
+		require(abi in setOf("arm64-v8a", "armeabi-v7a", "x86_64"))
+		val active = File("/data/adb/modules/clash_android_tproxy")
+		check(!File(active, "disable").exists() && !File(active, "remove").exists()) { "KernelSU module disabled or removed" }
+		// KernelSU stages first installs until reboot. Use the installed version during upgrades.
+		val module =
+			if (!File(active, "bin").exists() && File(active, "update").exists()) {
+				File("/data/adb/modules_update/clash_android_tproxy")
+			} else {
+				active
+			}
+		val launcher = File(module, "bin/$abi/clash-tproxy")
+		check(File(module, "protocol-1").isFile && launcher.isFile && launcher.canExecute()) { "Install the Clash Android TPROXY module" }
+		return launcher
 	}
 
 	private fun start(
-		dir: File,
-		abi: String,
+		launcher: File,
 		library: String,
 		control: String,
 		uid: Int,
@@ -106,8 +95,8 @@ internal object TproxyManager {
 				"/system/bin/sh",
 				"-c",
 				"""exec "$@" >/dev/null 2>&1""",
-				"clash-launcher",
-				launcher(dir, abi).path,
+				"clash-tproxy",
+				launcher.path,
 				uid.toString(),
 				library,
 			).start()
@@ -117,7 +106,7 @@ internal object TproxyManager {
 			while (true) {
 				check(runCatching { child.exitValue() }.isFailure) { "Native launcher exited" }
 				val status = TproxySocket.request(control, uid)
-				if (status != null && listening(status, config)) break
+				if (status?.ownerUid == 0 && listening(status, config)) break
 				check(SystemClock.elapsedRealtime() < deadline) { "Transparent listeners did not start" }
 				Thread.sleep(100)
 			}

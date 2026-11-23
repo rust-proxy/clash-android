@@ -48,6 +48,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -67,6 +68,7 @@ import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.annotation.RootGraph
 import com.ramcosta.composedestinations.generated.destinations.AppSelectorScreenDestination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
+import kotlinx.coroutines.launch
 import rs.clash.android.BuildConfig
 import rs.clash.android.MainActivity
 import rs.clash.android.R
@@ -74,6 +76,7 @@ import rs.clash.android.model.MAX_UI_SCALE
 import rs.clash.android.model.MIN_UI_SCALE
 import rs.clash.android.model.UI_SCALE_STEP
 import rs.clash.android.model.UiScale
+import rs.clash.android.service.requestKernelSuModuleInstall
 import rs.clash.android.util.PermissionHelper
 import rs.clash.android.viewmodel.AppFilterMode
 import rs.clash.android.viewmodel.DarkModePreference
@@ -111,6 +114,7 @@ fun SettingsScreen(
 	var showDarkModeDialog by remember { mutableStateOf(false) }
 	var showLanguageDialog by remember { mutableStateOf(false) }
 	val context = LocalContext.current
+	val scope = rememberCoroutineScope()
 	val activity = context as? MainActivity
 	val scale = UiScale(activity?.recommendedScale ?: 100, viewModel.manualUiScale)
 	var hasNotificationPermission by remember {
@@ -264,6 +268,13 @@ fun SettingsScreen(
 				item { SectionHeader(text = stringResource(R.string.mode_tproxy)) }
 				item {
 					SettingsCard {
+						SettingsItem(
+							icon = Icons.Default.SystemUpdate,
+							title = stringResource(R.string.ksu_install_module),
+							subtitle = stringResource(R.string.ksu_install_module_desc),
+							onClick = { scope.launch { requestKernelSuModuleInstall(context) } },
+						)
+						HorizontalDivider(modifier = Modifier.padding(start = 56.dp))
 						SettingsSwitchItem(
 							icon = Icons.Default.Dns,
 							title = stringResource(R.string.tproxy_system_dns),

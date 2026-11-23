@@ -23,6 +23,13 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.ClashAndroid"
         tools:targetApi="31">
+        <provider
+            android:name=".service.KernelSuModuleProvider"
+            android:authorities="${applicationId}.kernelsu"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/kernelsu_paths"/>
+        </provider>
         <activity
             android:name=".MainActivity"
             android:exported="true"

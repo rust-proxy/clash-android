@@ -18,6 +18,55 @@ googleServices {
 	missingGoogleServicesStrategy = MissingGoogleServicesStrategy.IGNORE
 }
 
+val kernelSuSource = rootProject.layout.projectDirectory.dir("kernelsu")
+val kernelSuTargets =
+	mapOf("arm64-v8a" to "aarch64-linux-android", "armeabi-v7a" to "armv7-linux-androideabi", "x86_64" to "x86_64-linux-android")
+val kernelSuCargoDir = layout.buildDirectory.dir("kernelsu-cargo")
+val phoneArm64 = providers.gradleProperty("phoneArm64").map(String::toBoolean).getOrElse(false)
+val kernelSuLaunchers =
+	kernelSuTargets.mapValues { (abi, triple) ->
+		tasks.register<Exec>("buildKernelSuLauncher" + triple.substringBefore('-').replaceFirstChar { it.uppercase() }) {
+			workingDir(kernelSuSource)
+			inputs.files(kernelSuSource.asFileTree.matching { include("Cargo.toml", "Cargo.lock", "src/**") })
+			inputs.property("ndkVersion", providers.gradleProperty("clashNdkVersion"))
+			outputs.file(kernelSuCargoDir.map { it.file("$triple/release/clash-tproxy") })
+			val ndkDirectory = androidComponents.sdkComponents.ndkDirectory.get()
+			environment("ANDROID_NDK_HOME", ndkDirectory.asFile.absolutePath)
+			commandLine("cargo", "ndk", "--platform", "23", "-t", abi)
+			args("rustc", "--release", "--locked", "--target-dir", kernelSuCargoDir.get().asFile.absolutePath)
+			args("--", "-C", "link-arg=-Wl,-z,max-page-size=16384")
+		}
+	}
+
+abstract class KernelSuModuleAssets : Sync() {
+	@get:OutputDirectory
+	abstract val assets: DirectoryProperty
+}
+
+androidComponents.onVariants { variant ->
+	val stage =
+		tasks.register<KernelSuModuleAssets>("prepare${variant.name.replaceFirstChar { it.uppercase() }}KernelSuModule") {
+			from(kernelSuSource) {
+				include("module.prop", "customize.sh", "skip_mount")
+				into("kernelsu")
+			}
+			for ((abi, launcher) in kernelSuLaunchers) {
+				if (!phoneArm64 || variant.buildType != "debug" || abi == "arm64-v8a") {
+					from(launcher) { into("kernelsu/bin/$abi") }
+				}
+			}
+			into(assets)
+		}
+	variant.sources.assets?.addGeneratedSourceDirectory(stage, KernelSuModuleAssets::assets)
+	if (variant.name == "release") {
+		tasks.register<Zip>("packageKernelSuModule") {
+			from(stage.flatMap { it.assets.dir("kernelsu") })
+			archiveFileName.set("clash-android-tproxy.zip")
+			destinationDirectory.set(rootProject.layout.buildDirectory.dir("kernelsu"))
+		}
+	}
+}
+
 // Keep unconfigured checkouts buildable and test data separate from production.
 val firebaseRelease = file("src/release/google-services.json").isFile
 val firebaseDebug = file("src/debug/google-services.json").isFile
@@ -116,7 +165,7 @@ android {
 
 		testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 		ndk {
-			abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a", "x86_64"))
+			abiFilters.addAll(if (phoneArm64) setOf("arm64-v8a") else kernelSuTargets.keys)
 		}
 		proguardFiles(
 			getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -169,7 +218,7 @@ android {
 	}
 	splits {
 		abi {
-			isEnable = env("ANDROID_SPLIT_ABI_ENABLE") == "true"
+			isEnable = !phoneArm64 && env("ANDROID_SPLIT_ABI_ENABLE") == "true"
 			reset()
 			include("arm64-v8a", "armeabi-v7a", "x86_64")
 			isUniversalApk = env("ANDROID_SPLIT_ABI_UNIVERSAL_APK") == "true"
