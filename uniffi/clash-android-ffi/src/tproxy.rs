@@ -176,7 +176,9 @@ async fn serve(config: Session) -> Result<()> {
                 conn = socket.accept() => conn?,
             };
             let uid = peer.peer_cred()?.uid();
-            if uid != 0 && uid != unsafe { libc::getuid() } {
+            // The module runs with UID 0 and the controlling app's primary GID.
+            // The app can read status. Only the root manager may activate or stop us.
+            if uid != 0 && uid != unsafe { libc::getgid() } {
                 continue;
             }
             let Ok(Ok(request)) = timeout(Duration::from_secs(1), peer.read_u8()).await else {

@@ -1,6 +1,7 @@
 package rs.clash.android.service
 
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.net.LocalSocket
 import android.net.LocalSocketAddress
 import android.os.Build
@@ -28,8 +29,22 @@ import java.io.IOException
 import java.io.InputStream
 import java.util.zip.ZipFile
 
+internal val ApplicationInfo.installedApks: List<String>
+	get() = listOf(sourceDir) + splitSourceDirs.orEmpty()
+
+/** Select the same ABI for the module launcher and the library it loads. */
+internal fun findTproxyCore(apks: List<String>): Pair<String, String> {
+	val abis = if (Process.is64Bit()) Build.SUPPORTED_64_BIT_ABIS else Build.SUPPORTED_32_BIT_ABIS
+	return apks.firstNotNullOfOrNull { path ->
+		ZipFile(path).use { zip ->
+			abis.firstOrNull { zip.getEntry("lib/$it/libclash_android_ffi.so") != null }?.let { path to it }
+		}
+	} ?: throw IOException("No compatible TPROXY core in installed APKs")
+}
+
 internal data class NativeStatus(
 	val pid: Int,
+	val ownerUid: Int,
 	val ready: Boolean,
 	val mixedPort: Int,
 	val tcpDnsBackend: String?,
@@ -52,14 +67,15 @@ internal object TproxySocket {
 			}
 			socket.soTimeout = 6500
 			val peer = socket.peerCredentials
-			check(peer.uid == 9999 && peer.gid == uid) { "Unexpected TPROXY socket owner" }
+			// An App update can still find a legacy AID_NOBODY session to stop.
+			check((peer.uid == 0 || peer.uid == 9999) && peer.gid == uid) { "Unexpected TPROXY socket owner" }
 			socket.outputStream.write(command.code)
 			val reply = socket.inputStream.bufferedReader().readLine() ?: error("Core disconnected")
 			if (reply == "STOPPED") return null
 			val fields = reply.split(' ')
 			val (phase, port) = fields
 			check(phase == "STARTING" || phase == "READY")
-			return NativeStatus(peer.pid, phase == "READY", port.toInt(), fields.getOrNull(2))
+			return NativeStatus(peer.pid, peer.uid, phase == "READY", port.toInt(), fields.getOrNull(2))
 		}
 	}
 }
@@ -186,14 +202,8 @@ internal class NativeTproxy(
 		config: JSONObject,
 	) {
 		val info = context.applicationInfo
-		val apks = listOf(info.sourceDir) + info.splitSourceDirs.orEmpty()
-		val abis = if (Process.is64Bit()) Build.SUPPORTED_64_BIT_ABIS else Build.SUPPORTED_32_BIT_ABIS
-		val (apk, abi) =
-			apks.firstNotNullOf { path ->
-				ZipFile(path).use { zip ->
-					abis.firstOrNull { zip.getEntry("lib/$it/libclash_android_ffi.so") != null }?.let { path to it }
-				}
-			}
+		val apks = info.installedApks
+		val (apk, abi) = findTproxyCore(apks)
 		val library =
 			File(info.nativeLibraryDir, "libclash_android_ffi.so").takeIf { it.isFile }?.path
 				?: "$apk!/lib/$abi/libclash_android_ffi.so"
@@ -215,18 +225,20 @@ internal class NativeTproxy(
 			)
 		val command = "export CLASSPATH=${quote(apks.joinToString(":"))}; exec " + args.joinToString(" ", transform = ::quote)
 		val profile = File(context.noBackupFilesDir, "tproxy-profile.yaml")
-		if (action == "start" || action == "restart") {
-			prepareSession(config, profile, uid)
-		}
-		val process = ProcessBuilder("su", "-c", command).redirectErrorStream(true).start()
 		try {
-			process.outputStream.bufferedWriter().use { it.write(config.toString()) }
-			process.inputStream.bufferedReader().useLines { lines -> lines.forEach { _ -> } }
-			check(process.waitFor() == 0) { "KernelSU $action failed" }
-			// The core has parsed the profile before acknowledging startup.
-			profile.delete()
+			if (action == "start" || action == "restart") {
+				prepareSession(config, profile, uid)
+			}
+			val process = ProcessBuilder("su", "-c", command).redirectErrorStream(true).start()
+			try {
+				process.outputStream.bufferedWriter().use { it.write(config.toString()) }
+				process.inputStream.bufferedReader().useLines { lines -> lines.forEach { _ -> } }
+				check(process.waitFor() == 0) { "KernelSU $action failed" }
+			} finally {
+				process.destroy()
+			}
 		} finally {
-			process.destroy()
+			profile.delete()
 		}
 	}
 
@@ -251,7 +263,7 @@ internal class NativeTproxy(
 		if (cache.isFile) {
 			val metadata = Os.lstat(cache.path)
 			if (metadata.st_uid == uid && OsConstants.S_ISREG(metadata.st_mode)) {
-				Os.chmod(cache.path, (metadata.st_mode and 4095) or OsConstants.S_IWGRP)
+				Os.chmod(cache.path, (metadata.st_mode and 4095) or OsConstants.S_IRGRP or OsConstants.S_IWGRP)
 			}
 		}
 		File(config.getString("path")).inputStream().use { copyForCore(it, profile) }

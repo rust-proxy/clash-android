@@ -18,7 +18,7 @@ Android 安装包支持 `arm64-v8a`、`armeabi-v7a` 和 `x86_64`。通用 APK �
 
 ## 使用 KernelSU TPROXY
 
-在 KernelSU 管理器的「超级用户」中授权 Clash Android。停止当前代理，在「设置 → 代理模式」选择 KernelSU TPROXY，然后从首页启动。原有配置可直接使用。此模式通过内核的 TPROXY 和策略路由转发本机 TCP、UDP，保留 Android VPN 槽位。开启 IPv6 时，设备内核也需要支持 IPv6 TPROXY。
+停止当前代理，在 App 的「设置 → 代理模式」选择 KernelSU TPROXY。点击同一页的「安装或更新模块」，在 KernelSU 管理器中确认安装 App 按当前设备 ABI 即时生成的模块 ZIP，并在「超级用户」中授权 Clash Android。回到 App 首页启动代理。每次启动或重启时，App 都会传入当前选中的配置和代理设置。模块以 UID 0 启动原生进程，加载当前已安装 APK 中的 Clash 内核。此模式通过 TPROXY 和策略路由转发本机 TCP、UDP，保留 Android VPN 槽位。开启 IPv6 时，设备内核也需要支持 IPv6 TPROXY。
 
 设置页的 TPROXY 专区默认开启「接管系统 DNS」，将非回环单播的 UDP/53 和 TCP/53 交给 Clash 配置的 DNS 解析器。Android 严格私人 DNS 和应用内 DoH 使用加密协议，不在此开关的接管范围内。切回 VPN 后可继续使用此前保存的分应用设置。
 
@@ -50,6 +50,14 @@ Android 安装包支持 `arm64-v8a`、`armeabi-v7a` 和 `x86_64`。通用 APK �
 # Develop
 
 每次修改 Rust 部分后使用 `generate-bindings` 更新绑定。
+
+Gradle 使用 `cargo-ndk` 编译模块的 Rust 启动器。构建前安装 `gradle.properties` 指定的 NDK，并用 rustup 安装所需的 Android 目标。APK 直接使用模块目录中的安装文件和启动器。点击「安装或更新模块」时，App 按当前 ABI 生成单架构 ZIP。
+
+| 命令 | 产物 |
+| --- | --- |
+| `just phone` | 只编译 arm64 的 Clash 内核和启动器，生成 `app/build/outputs/apk/debug/app-debug.apk` |
+| `just build` | 默认构建支持 arm64-v8a、armeabi-v7a 和 x86_64 的 Debug APK |
+| `just module` | 将发布版的模块目录打包为三架构 ZIP，输出到 `build/kernelsu/clash-android-tproxy.zip` |
 
 ## 在模拟器测试代理流量
 

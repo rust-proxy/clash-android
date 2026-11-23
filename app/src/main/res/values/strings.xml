@@ -39,10 +39,14 @@
     <string name="proxy_mode">代理模式</string>
     <string name="tproxy_authorization_hint">请先在 KernelSU 管理器中授予 Clash Android 超级用户权限。退出或强行停止 App 后，TPROXY 会继续运行。要停止代理，请重新打开 App 并在首页停止。</string>
     <string name="tproxy_system_dns">接管系统 DNS</string>
+    <string name="ksu_install_module">安装或更新模块</string>
+    <string name="ksu_install_module_desc">为当前设备生成 TPROXY 模块，并交给 KernelSU 管理器安装。</string>
+    <string name="ksu_manager_missing">请安装或更新 KernelSU 管理器，然后重试。</string>
+    <string name="ksu_module_open_failed">无法打开模块安装包，请重试。</string>
     <string name="tproxy_system_dns_desc">使用 Clash 解析全设备的明文 DNS 请求（UDP 和 TCP 53）。</string>
     <string name="mode_tproxy">KernelSU TPROXY</string>
     <string name="proxy_mode_stop_first">请先停止代理，再切换模式。</string>
-    <string name="tproxy_failed">TPROXY 启动失败。请检查 KernelSU 管理器是否已授权 Clash Android，以及内核是否支持 TPROXY。</string>
+    <string name="tproxy_failed">TPROXY 操作失败。请在 KernelSU 中安装并启用 Clash Android TPROXY 模块，授权 Clash Android，并确认内核支持 TPROXY。</string>
     <string name="stat_vpn">VPN</string>
     <string name="stat_vpn_running">运行中</string>
     <string name="stat_vpn_stopped">已停止</string>

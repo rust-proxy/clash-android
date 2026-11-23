@@ -9,3 +9,11 @@ generate-bindings *cargo_args:
 
 build:
   ./gradlew assembleDebug
+
+# Build the standalone KernelSU ZIP for all supported ABIs.
+module:
+  ./gradlew :app:packageKernelSuModule
+
+# Build an arm64-only debug APK for a physical phone.
+phone:
+  ./gradlew -PphoneArm64=true :app:assembleDebug

@@ -124,7 +124,7 @@ jobs:
           : "${FIREBASE_RELEASE_JSON:?Set FIREBASE_RELEASE_GOOGLE_SERVICES_JSON to the production Android app configuration}"
           mkdir -p app/src/release
           printf '%s' "$FIREBASE_RELEASE_JSON" > app/src/release/google-services.json
-          ./gradlew --build-cache -PuploadFirebaseMapping=true app:assembleRelease
+          ./gradlew --build-cache -PuploadFirebaseMapping=true app:assembleRelease :app:packageKernelSuModule
 
           ./gradlew :app:generateCrashlyticsSymbolFileRelease
           # Check the actual APK against the unstripped Cargo outputs before uploading symbols.
@@ -186,7 +186,9 @@ jobs:
         if: github.event_name != 'pull_request'
         env:
           VERSION: ${{ steps.version.outputs.version }}
-        run: python3 .github/prepare-update.py app/build/outputs/apk/release/output-metadata.json output "$VERSION" CHANGELOG.md
+        run: |
+          python3 .github/prepare-update.py app/build/outputs/apk/release/output-metadata.json output "$VERSION" CHANGELOG.md
+          cp build/kernelsu/clash-android-tproxy.zip output/
 
       - name: Create and publish release
         if: github.event_name != 'pull_request'
