@@ -108,7 +108,8 @@ internal class TproxyRules(
 		val pre = "CLASHRS_PRE"
 		val table = "17893"
 		val pref = "9055"
-		val mark = "0x40000000/0x40000000"
+		val interceptBit = "0x10000000"
+		val mark = "$interceptBit/$interceptBit"
 		val loopback = if (v6) "::1" else "127.0.0.1"
 
 		fun rule(
@@ -163,7 +164,7 @@ internal class TproxyRules(
 		}
 		// Android enables tcp_fwmark_accept. Once policy routing has delivered the
 		// packet locally, prevent its SYN-ACK from inheriting our interception bit.
-		rule("INPUT", "-i", "lo", "-m", "mark", "--mark", mark, "-j", "MARK", "--set-xmark", "0/0x40000000")
+		rule("INPUT", "-i", "lo", "-m", "mark", "--mark", mark, "-j", "MARK", "--set-xmark", "0/$interceptBit")
 		rule("PREROUTING", "-i", "lo", "-m", "mark", "--mark", mark, "-j", pre)
 		// Attach OUTPUT last and detach it first so no new traffic enters during cleanup.
 		for (proto in listOf("tcp", "udp")) {
