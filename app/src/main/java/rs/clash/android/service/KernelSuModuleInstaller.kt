@@ -3,6 +3,7 @@ package rs.clash.android.service
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.content.res.AssetManager
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -15,6 +16,21 @@ import java.util.zip.ZipOutputStream
 
 class KernelSuModuleProvider : FileProvider()
 
+private fun ZipOutputStream.addModuleAsset(
+	assets: AssetManager,
+	path: String,
+) {
+	val asset = "kernelsu/$path"
+	val children = assets.list(asset).orEmpty()
+	if (children.isNotEmpty()) {
+		for (child in children) addModuleAsset(assets, "$path/$child")
+		return
+	}
+	putNextEntry(ZipEntry(path))
+	assets.open(asset).use { it.copyTo(this) }
+	closeEntry()
+}
+
 internal suspend fun requestKernelSuModuleInstall(context: Context) {
 	try {
 		val uri =
@@ -25,11 +41,10 @@ internal suspend fun requestKernelSuModuleInstall(context: Context) {
 				val zip = File(directory, "clash-android-tproxy-$abi.zip")
 				try {
 					ZipOutputStream(temp.outputStream().buffered()).use { archive ->
-						for (entry in listOf("module.prop", "customize.sh", "skip_mount", "bin/$abi/clash-tproxy")) {
-							archive.putNextEntry(ZipEntry(entry))
-							context.assets.open("kernelsu/$entry").use { it.copyTo(archive) }
-							archive.closeEntry()
+						for (entry in context.assets.list("kernelsu").orEmpty()) {
+							if (entry != "bin") archive.addModuleAsset(context.assets, entry)
 						}
+						archive.addModuleAsset(context.assets, "bin/$abi/clash-tproxy")
 					}
 					if (!temp.renameTo(zip)) throw IOException("Cannot prepare the module ZIP")
 				} finally {

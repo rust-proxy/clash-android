@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'">
+  <title>TPROXY 诊断</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="diagnostics.js" defer></script>
+</head>
+<body>
+  <main>
+    <header>
+      <div><h1>TPROXY 诊断</h1><p id="updated" role="status">正在读取设备数据…</p></div>
+      <button type="button" id="refresh">刷新</button>
+    </header>
+    <section class="core">
+      <h2>原生内核</h2>
+      <p id="processes" class="metric">读取中…</p>
+    </section>
+    <section>
+      <h2>策略路由</h2>
+      <p class="hint">优先级 9055 · 路由表 17893</p>
+      <h3>IPv4</h3><pre id="route4">读取中…</pre>
+      <h3>IPv6</h3><pre id="route6">读取中…</pre>
+    </section>
+    <section>
+      <h2>DoT 套接字</h2>
+      <p class="hint">内核持有的出站 TCP/853 连接</p>
+      <div id="sockets">读取中…</div>
+    </section>
+    <section>
+      <h2>最近的 DNS 超时</h2>
+      <p class="hint">当前内核进程的系统日志，每个进程最近 20 条</p>
+      <pre id="timeouts">读取中…</pre>
+    </section>
+  </main>
+</body>
+</html>

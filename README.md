@@ -26,6 +26,8 @@ Android 安装包支持 `arm64-v8a`、`armeabi-v7a` 和 `x86_64`。通用 APK �
 
 如果代理内核本身意外退出，重新打开 App 会清理上次会话的规则，之后可以从首页再次启动。
 
+在 KernelSU 管理器的模块列表中打开「Clash Android TPROXY」的 WebUI，点击「刷新」可查看内核 PID、有效 UID、IPv4/IPv6 策略路由、该进程持有的 TCP/853 套接字及其 UID，以及当前进程日志中最近的 DNS 超时。更新模块后，按管理器提示重启以启用新版 WebUI。
+
 ## 软件截图
 
 | 总览 · VPN 运行中 | 总览 · 深色模式 | 代理组选择 |

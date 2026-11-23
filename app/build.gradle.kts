@@ -47,7 +47,7 @@ androidComponents.onVariants { variant ->
 	val stage =
 		tasks.register<KernelSuModuleAssets>("prepare${variant.name.replaceFirstChar { it.uppercase() }}KernelSuModule") {
 			from(kernelSuSource) {
-				include("module.prop", "customize.sh", "skip_mount")
+				include("module.prop", "customize.sh", "skip_mount", "diagnostics.sh", "webroot/**")
 				into("kernelsu")
 			}
 			for ((abi, launcher) in kernelSuLaunchers) {
