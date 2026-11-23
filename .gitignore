@@ -32,6 +32,8 @@ replay_pid*
 /.idea/*
 .DS_Store
 /build
+/kernelsu/webui/node_modules/
+/kernelsu/webui/dist/
 /captures
 .externalNativeBuild
 .cxx

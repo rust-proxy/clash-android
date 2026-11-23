@@ -19,6 +19,21 @@ googleServices {
 }
 
 val kernelSuSource = rootProject.layout.projectDirectory.dir("kernelsu")
+val webUiSource = kernelSuSource.dir("webui")
+val npmCommand = if (System.getProperty("os.name").startsWith("Windows")) listOf("cmd", "/d", "/c", "npm") else listOf("npm")
+val installWebUiDependencies by tasks.registering(Exec::class) {
+	workingDir(webUiSource)
+	inputs.files(webUiSource.file("package.json"), webUiSource.file("package-lock.json"))
+	outputs.dir(webUiSource.dir("node_modules"))
+	commandLine(npmCommand + listOf("ci", "--include=dev", "--no-audit", "--no-fund"))
+}
+val buildKernelSuWebUi by tasks.registering(Exec::class) {
+	dependsOn(installWebUiDependencies)
+	workingDir(webUiSource)
+	inputs.files(webUiSource.asFileTree.matching { exclude("node_modules/**", "dist/**") })
+	outputs.dir(webUiSource.dir("dist"))
+	commandLine(npmCommand + listOf("run", "build"))
+}
 val kernelSuTargets =
 	mapOf("arm64-v8a" to "aarch64-linux-android", "armeabi-v7a" to "armv7-linux-androideabi", "x86_64" to "x86_64-linux-android")
 val kernelSuCargoDir = layout.buildDirectory.dir("kernelsu-cargo")
@@ -47,9 +62,10 @@ androidComponents.onVariants { variant ->
 	val stage =
 		tasks.register<KernelSuModuleAssets>("prepare${variant.name.replaceFirstChar { it.uppercase() }}KernelSuModule") {
 			from(kernelSuSource) {
-				include("module.prop", "customize.sh", "skip_mount", "diagnostics.sh", "webroot/**")
+				include("module.prop", "customize.sh", "skip_mount")
 				into("kernelsu")
 			}
+			from(buildKernelSuWebUi) { into("kernelsu/webroot") }
 			for ((abi, launcher) in kernelSuLaunchers) {
 				if (!phoneArm64 || variant.buildType != "debug" || abi == "arm64-v8a") {
 					from(launcher) { into("kernelsu/bin/$abi") }

@@ -53,7 +53,7 @@ Android 安装包支持 `arm64-v8a`、`armeabi-v7a` 和 `x86_64`。通用 APK �
 
 每次修改 Rust 部分后使用 `generate-bindings` 更新绑定。
 
-Gradle 使用 `cargo-ndk` 编译模块的 Rust 启动器。构建前安装 `gradle.properties` 指定的 NDK，并用 rustup 安装所需的 Android 目标。APK 直接使用模块目录中的安装文件和启动器。点击「安装或更新模块」时，App 按当前 ABI 生成单架构 ZIP。
+Gradle 使用 `cargo-ndk` 编译模块的 Rust 启动器和诊断子命令，并通过 npm 和 Vite 将 Svelte 页面编译到模块的 `webroot/`。构建前安装 Node.js 22.12+（或 24 LTS）及 npm、`gradle.properties` 指定的 NDK，并用 rustup 安装所需的 Android 目标。`just phone` 和 `just module` 都会自动构建 WebUI。点击「安装或更新模块」时，App 按当前 ABI 生成单架构 ZIP。
 
 | 命令 | 产物 |
 | --- | --- |

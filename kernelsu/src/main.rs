@@ -1,11 +1,15 @@
 //! KernelSU starts this process as root and supplies the app UID, library
 //! path, and a session on stdin. The APK owns the proxy implementation.
 use std::{env, error::Error, ffi::CString, io, os::unix::ffi::OsStrExt};
+mod diagnostics;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut args = env::args_os().skip(1);
-    let app_uid: u32 = args
-        .next()
+    let first = args.next();
+    if first.as_deref() == Some(std::ffi::OsStr::new("--diagnostics")) && args.next().is_none() {
+        return diagnostics::report();
+    }
+    let app_uid: u32 = first
         .and_then(|arg| arg.to_str()?.parse().ok())
         .filter(|uid| (10000..20000).contains(&(uid % 100000)))
         .ok_or("invalid app UID")?;

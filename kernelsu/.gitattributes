@@ -1,3 +1,2 @@
 module.prop text eol=lf
 customize.sh text eol=lf
-diagnostics.sh text eol=lf

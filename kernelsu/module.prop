@@ -1,6 +1,6 @@
 id=clash_android_tproxy
 name=Clash Android TPROXY
-version=1.2.0
-versionCode=3
+version=1.2.1
+versionCode=4
 author=Clash Android
 description=Native UID 0 TPROXY for Clash Android. Start and stop the selected profile from the app.
