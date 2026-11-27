@@ -67,6 +67,8 @@ branch = "android"
 git = "https://github.com/rust-proxy/clash-rs.git"
 features = [
     "tuic",
+    "naive-static",
+    "naive-download",
     "shadowquic",
     "shadowsocks",
     "tun",

@@ -1,5 +1,6 @@
 import groovy.json.JsonSlurper
 import java.io.File
+import net.mullvad.androidrust.CargoBuildTask
 
 plugins {
     alias(libs.plugins.android.library)
@@ -79,6 +80,7 @@ if (sccacheExecutable != null) {
 cargo {
     module  = "../uniffi"  // Directory containing Cargo.toml
 	libname = "clash_android_ffi"
+	apiLevel = android.defaultConfig.minSdk
 
     extraCargoBuildArguments = arrayListOf("-p", "clash-android-ffi")
 
@@ -93,6 +95,23 @@ cargo {
 	targets = if (phoneArm64) listOf("arm64") else listOf("arm64", "arm", "x86_64")
     // Cargo keeps line tables here. AGP strips the APK copy; CI archives the originals.
     profile = "release"
+}
+
+// The Rust plugin assigns each task's environment after project evaluation.
+afterEvaluate {
+	tasks.withType<CargoBuildTask>().configureEach {
+		environmentOverrides.put("ANDROID_NDK_HOME", ndk.map { it.path.absolutePath })
+		environmentOverrides.put("CARGO_ENCODED_RUSTFLAGS", providers.provider {
+			// cronet-sys searches the unversioned NDK directory for libc++_static.a.
+			// Put the API's shared libc stubs ahead of the static libc.a beside it.
+			val tools = ndk.get().path.resolve("toolchains/llvm/prebuilt").listFiles()!!.single { it.isDirectory }
+			val stubs = tools.resolve("sysroot/usr/lib/${toolchain.get().binutilsTriple}/${apiLevel.get()}")
+			require(stubs.resolve("libc.so").isFile) { "Missing Android API stubs in $stubs" }
+			val inherited = System.getenv("CARGO_ENCODED_RUSTFLAGS")?.split('\u001f')
+				?: System.getenv("RUSTFLAGS").orEmpty().split(' ').filter(String::isNotBlank)
+			(inherited + "-Lnative=${stubs.absolutePath}").joinToString("\u001f")
+		})
+	}
 }
 
 val rustJniLibsDir = layout.buildDirectory.dir("rustJniLibs/android").get()!!

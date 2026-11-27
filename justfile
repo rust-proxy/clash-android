@@ -1,6 +1,8 @@
 [positional-arguments]
 generate-bindings *cargo_args:
-  cd uniffi && cargo ndk -t arm64-v8a build "$@" -p clash-android-ffi
+  cd uniffi && eval "$(cargo ndk-env -t arm64-v8a --platform 23)" && \
+    cargo ndk -t arm64-v8a --platform 23 build "$@" -p clash-android-ffi \
+      --config "target.aarch64-linux-android.rustflags=['-Lnative=$CARGO_NDK_SYSROOT_LIBS_PATH/23','-Lnative=$CARGO_NDK_SYSROOT_LIBS_PATH']"
   cd uniffi && cargo run "$@" -p uniffi-bindgen generate \
     --library target/aarch64-linux-android/debug/libclash_android_ffi.so \
     --language kotlin \
