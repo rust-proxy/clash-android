@@ -32,6 +32,8 @@ replay_pid*
 /.idea/*
 .DS_Store
 /build
+/buildSrc/build/
+/kernelsu/target/
 /kernelsu/webui/node_modules/
 /kernelsu/webui/dist/
 /captures

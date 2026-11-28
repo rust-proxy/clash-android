@@ -1,6 +1,6 @@
-import groovy.json.JsonSlurper
 import java.io.File
 import net.mullvad.androidrust.CargoBuildTask
+import rs.clash.build.CargoWorkspace
 
 plugins {
     alias(libs.plugins.android.library)
@@ -97,9 +97,20 @@ cargo {
     profile = "release"
 }
 
-// The Rust plugin assigns each task's environment after project evaluation.
+val ffiTargetDir = CargoWorkspace.targetDirectory(providers, rootProject.layout.projectDirectory.dir("uniffi"))
+
+// The Rust plugin assigns each task's target and environment after project evaluation.
 afterEvaluate {
+	// Preserve the plugin's local.properties override, resolved relative to :core.
+	val localTarget = cargo.localProperties.getProperty("rust.cargoTargetDir")?.let { file(it).absolutePath }
 	tasks.withType<CargoBuildTask>().configureEach {
+		if (localTarget != null) {
+			target.set(localTarget)
+			environmentOverrides.put("CARGO_TARGET_DIR", localTarget)
+		} else {
+			// The plugin resolves relative paths from :core, while Cargo runs in uniffi.
+			target.set(ffiTargetDir.map { it.absolutePath })
+		}
 		environmentOverrides.put("ANDROID_NDK_HOME", ndk.map { it.path.absolutePath })
 		environmentOverrides.put("CARGO_ENCODED_RUSTFLAGS", providers.provider {
 			// cronet-sys searches the unversioned NDK directory for libc++_static.a.

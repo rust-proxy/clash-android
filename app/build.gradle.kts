@@ -3,6 +3,7 @@ import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesS
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.ValueSource
 import org.gradle.api.provider.ValueSourceParameters
+import rs.clash.build.CargoWorkspace
 
 plugins {
 	alias(libs.plugins.android.application)
@@ -36,7 +37,7 @@ val buildKernelSuWebUi by tasks.registering(Exec::class) {
 }
 val kernelSuTargets =
 	mapOf("arm64-v8a" to "aarch64-linux-android", "armeabi-v7a" to "armv7-linux-androideabi", "x86_64" to "x86_64-linux-android")
-val kernelSuCargoDir = layout.buildDirectory.dir("kernelsu-cargo")
+val kernelSuCargoDir = CargoWorkspace.targetDirectory(providers, kernelSuSource)
 val phoneArm64 = providers.gradleProperty("phoneArm64").map(String::toBoolean).getOrElse(false)
 val kernelSuLaunchers =
 	kernelSuTargets.mapValues { (abi, triple) ->
@@ -44,12 +45,18 @@ val kernelSuLaunchers =
 			workingDir(kernelSuSource)
 			inputs.files(kernelSuSource.asFileTree.matching { include("Cargo.toml", "Cargo.lock", "src/**") })
 			inputs.property("ndkVersion", providers.gradleProperty("clashNdkVersion"))
-			outputs.file(kernelSuCargoDir.map { it.file("$triple/release/clash-tproxy") })
+			val launcher = layout.buildDirectory.file("kernelsu-launchers/$abi/clash-tproxy")
+			val cargoLauncher = kernelSuCargoDir.map { it.resolve("$triple/release/clash-tproxy") }
+			inputs.property("cargoTargetDirectory", kernelSuCargoDir.map { it.absolutePath })
+			outputs.file(launcher)
 			val ndkDirectory = androidComponents.sdkComponents.ndkDirectory.get()
 			environment("ANDROID_NDK_HOME", ndkDirectory.asFile.absolutePath)
 			commandLine("cargo", "ndk", "--platform", "23", "-t", abi)
-			args("rustc", "--release", "--locked", "--target-dir", kernelSuCargoDir.get().asFile.absolutePath)
+			args("rustc", "--release", "--locked")
 			args("--", "-C", "link-arg=-Wl,-z,max-page-size=16384")
+			doLast {
+				cargoLauncher.get().copyTo(launcher.get().asFile, overwrite = true)
+			}
 		}
 	}
 

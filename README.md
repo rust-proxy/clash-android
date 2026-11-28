@@ -37,6 +37,8 @@
 | `just build` | 构建三架构 Debug APK |
 | `just module` | 生成三架构模块包 `build/kernelsu/clash-android-tproxy.zip` |
 
+生成绑定、构建 APK 和打包 KernelSU 模块时，Rust 产物都写入 Cargo 配置的 target 目录。可以在 `.cargo/config.toml` 中设置 `build.target-dir`，也可以通过环境变量 `CARGO_TARGET_DIR` 临时覆盖。
+
 ### 模拟器流量测试（Android 10+）
 
 在宿主机运行 `python traffic-test/echo_server.py`，再用 `.\gradlew.bat :traffic-test:installDebug` 安装「流量测试」。先关闭代理，以默认目标 `10.0.2.2:39007` 测试 TCP、UDP 和系统 DNS。再将测试应用纳入代理范围，启动代理并复测。验证远端节点时，将目标改为该节点可达的回显服务，对照请求编号、来源地址和 Clash 日志确认路径。

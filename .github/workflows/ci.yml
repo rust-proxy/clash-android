@@ -75,6 +75,9 @@ jobs:
         with:
           tool: cargo-ndk,just
 
+      - name: Build Rust workspaces with a shared Cargo target directory
+        run: echo "CARGO_BUILD_TARGET_DIR=$RUNNER_TEMP/cargo-target" >> "$GITHUB_ENV"
+
       - name: Identify binding generator inputs
         id: generator
         run: |
